@@ -37,8 +37,9 @@ import {
  * Repository read-only berbasis Google Sheets.
  *
  * Phase 2D: implementasi ini HANYA membaca. Tidak ada create/update/delete,
- * tidak ada append, tidak ada batchUpdate. `getRepositories()` belum diubah;
- * mock repository tetap aktif sampai Phase 2E.
+ * tidak ada append, tidak ada batchUpdate. Sejak Phase 2E, repository ini
+ * aktif via `getRepositories()`; mock repository tetap tersedia sebagai
+ * implementasi fallback/testing.
  */
 
 interface SheetData {

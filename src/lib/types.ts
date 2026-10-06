@@ -42,6 +42,7 @@ export interface Client {
   contactPerson?: string;
   phone?: string;
   email?: string;
+  address?: string;
   notes?: string;
 }
 
@@ -60,6 +61,7 @@ export interface Venue {
   address?: string;
   city?: string;
   capacity?: number;
+  contact?: string;
   notes?: string;
 }
 
@@ -70,6 +72,7 @@ export interface Crew {
   /** Default payment yang tersimpan di master Crew. */
   defaultPayment: number;
   phone?: string;
+  notes?: string;
 }
 
 export interface Admin {
@@ -115,6 +118,7 @@ export interface Job {
   venueId?: string;
   executionDate: string;
   status: JobStatus;
+  location?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -135,6 +139,8 @@ export interface JobCrew {
   role: string;
   /** Payment aktual untuk assignment ini. */
   actualPayment: number;
+  /** Status pembayaran crew untuk assignment ini (terpisah dari master crew). */
+  paymentStatus?: PaymentStatus;
   notes?: string;
 }
 
@@ -146,6 +152,9 @@ export interface Delivery {
   id: string;
   jobId: string;
   name: string;
+  /** Jenis delivery (mis. VIDEO, PHOTO, ALBUM) sesuai schema sheet. */
+  deliveryType?: string;
+  quantity?: number;
   deadline: string;
   status: DeliveryStatus;
   deliveredAt?: string;
@@ -183,6 +192,7 @@ export interface ClientPayment {
   dueDate?: string;
   paidDate?: string;
   status: PaymentStatus;
+  notes?: string;
 }
 
 /** Jenis pembayaran ke Vendor. */
@@ -202,6 +212,7 @@ export interface VendorPayment {
   dueDate?: string;
   paidDate?: string;
   status: PaymentStatus;
+  notes?: string;
 }
 
 export interface Expense {
@@ -211,4 +222,5 @@ export interface Expense {
   category: string;
   amount: number;
   date: string;
+  notes?: string;
 }

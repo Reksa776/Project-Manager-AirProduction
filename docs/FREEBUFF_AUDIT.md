@@ -1222,3 +1222,143 @@ nyata:
 - [x] Audit diperbarui
 
 Status akhir: **PHASE 2D — COMPLETED**.
+
+---
+
+# FREEBUFF AUDIT — PHASE 2E (GOOGLE REPOSITORY → SERVICE SWITCH)
+
+## 1. Status
+
+**COMPLETED**
+
+## 2. Audit Field-by-Field (Google Sheet header → domain → mapper → service → UI)
+
+Audit dilakukan pada seluruh 11 worksheet. Temuan Phase 2D dikonfirmasi,
+lalu ditangani:
+
+| Field | Status Domain Sebelumnya | Keputusan Phase 2E |
+| --- | --- | --- |
+| `clients.address` | Hilang | Ditambahkan `Client.address?: string`, dipetakan. |
+| `clients.created_at`/`updated_at` | Tidak dibawa | TIDAK dibawa — metadata persistence, tidak dipakai service/UI. |
+| `vendors.created_at`/`updated_at` | Tidak dibawa | TIDAK dibawa (alasan sama). `contact`→`phone`, `notes`→`notes` sudah lengkap. |
+| `venues.contact` | Hilang | Ditambahkan `Venue.contact?: string`, dipetakan. |
+| `venues.created_at`/`updated_at` | Tidak dibawa | TIDAK dibawa. |
+| `crew.notes` | Hilang | Ditambahkan `Crew.notes?: string`, dipetakan. |
+| `crew.created_at`/`updated_at` | Tidak dibawa | TIDAK dibawa. |
+| `jobs.location` | Hilang | Ditambahkan `Job.location?: string`, dipetakan. |
+| `jobs.description` | → `notes` | Dipertahankan (`description` → `Job.notes`), semantic mapping tidak diubah, telah didokumentasikan. |
+| `jobs.created_at`/`updated_at` | → `createdAt`/`updatedAt` | Dipertahankan — Job sudah memilikinya sejak Phase 1. |
+| `job_crews.payment_status` | Hilang | Ditambahkan `JobCrew.paymentStatus?: PaymentStatus` (reuse enum existing `UNPAID/PARTIAL/PAID`), dipetakan dengan `optionalEnum` (kosong → undefined; nilai salah → error eksplisit). |
+| `job_crews.created_at`/`updated_at` | Tidak dibawa | TIDAK dibawa. |
+| `deliveries.delivery_type` | Hilang | Ditambahkan `Delivery.deliveryType?: string`, dipetakan. |
+| `deliveries.quantity` | Hilang | Ditambahkan `Delivery.quantity?: number`, dipetakan `optionalNumber`. |
+| `deliveries.created_at`/`updated_at` | Tidak dibawa | TIDAK dibawa. |
+| `client_payments.notes` | Hilang | Ditambahkan `ClientPayment.notes?: string`, dipetakan. |
+| `client_payments.created_at`/`updated_at` | Tidak dibawa | TIDAK dibawa. |
+| `vendor_payments.notes` | Hilang | Ditambahkan `VendorPayment.notes?: string`, dipetakan. |
+| `vendor_payments.created_at`/`updated_at` | Tidak dibawa | TIDAK dibawa. |
+| `expenses.notes` | Hilang | Ditambahkan `Expense.notes?: string`, dipetakan. |
+| `expenses.created_at`/`updated_at` | Tidak dibawa | TIDAK dibawa. |
+| `admins.password_hash` | Tidak dibawa | **Sengaja tetap TIDAK dipetakan** — authentication belum scope Phase 2E. |
+
+Field yang sudah lengkap dan tidak berubah: semua ID/relasi (`client_id`,
+`vendor_id`, `venue_id`, `crew_id`, `job_id`), `job_number`, `job_name`,
+`job_type`→`category`, `execution_date`, `status`, `role`, `contact`→`phone`,
+`default_payment`, `payment`→`actualPayment`, `item_name`→`name`, `deadline`,
+`term`, `type`, `amount`, `due_date`, `paid_date`, `category`, `description`,
+`expense_date`→`date`, `name`, `email`.
+
+## 3. File yang Diubah
+
+- `src/lib/types.ts` — menambah field optional: `Client.address`,
+  `Venue.contact`, `Crew.notes`, `Job.location`, `JobCrew.paymentStatus`,
+  `Delivery.deliveryType`, `Delivery.quantity`, `ClientPayment.notes`,
+  `VendorPayment.notes`, `Expense.notes`. Field optional agar mock data
+  existing tetap valid tanpa diubah.
+- `src/repositories/google/mapping.ts` — menambah helper `optionalNumber`
+  dan `optionalEnum`; `mapClient`/`mapVenue`/`mapCrew`/`mapJob`/`mapJobCrew`/
+  `mapDelivery`/`mapClientPayment`/`mapVendorPayment`/`mapExpense` kini
+  memetakan field business di atas. Tidak ada positional mapping baru.
+- `src/repositories/index.ts` — `getRepositories()` sekarang mengembalikan
+  `googleRepositories` (SATU titik switch tetap di sini). `mockRepositories`
+  tetap tersedia dan diekspor ulang.
+- `src/repositories/google/index.ts` — komentar diperbarui (Phase 2E aktif,
+  read-only tetap).
+- `README.md` — status data aktif diperbarui ke Google Sheets.
+
+Tidak berubah: `src/services/*`, `src/repositories/types.ts`,
+`src/repositories/mock/*`, `src/data/mock/*`, `src/components/*`,
+`src/app/*`, `src/lib/google-sheets/client.ts`, `package.json`.
+
+## 4. Repository Contract
+
+`googleRepositories` tetap memenuhi `DataRepositories` apa adanya — tidak ada
+method yang ditambah/dihapus dan tidak ada perubahan kontrak. Validasi:
+`npx tsc --noEmit` PASS.
+
+## 5. Mock Validity
+
+Seluruh field baru bersifat optional, sehingga seluruh mock data
+(`src/data/mock/*`) dan mock repository tetap valid tanpa perubahan. Tidak
+ada data mock dihapus atau nilainya dikarang.
+
+## 6. Read Path
+
+UI (`src/app`, `src/components`) → Service (`src/services/*`) →
+Repository (`getRepositories()` → `googleRepositories`) → Google Sheets
+(`spreadsheets.values.get`, scope `spreadsheets.readonly`).
+
+Tidak ada UI yang membaca Google Sheets langsung; service menjadi satu-satunya
+jembatan; business rule (Client XOR Vendor, status enum, termin payment)
+tetap di domain/service, bukan di repository.
+
+## 7. Spreadsheet Validation
+
+- Worksheet: 11 (tidak berubah, tidak ada yang dibuat/dihapus).
+- Setiap worksheet hanya berisi header — **tidak ada write operation**
+  selama Phase 2E (read-only).
+- Hasil read pada build production & smoke test: seluruh list kosong,
+  empty state tampil, tidak crash, tidak ada mock data bocor.
+
+## 8. Validation
+
+- TypeScript: **PASS** — `npx tsc --noEmit` exit code 0.
+- ESLint: **PASS** — `npx eslint .` exit code 0.
+- Build: **PASS** — `npm run build` exit code 0, 11 route.
+- Runtime/smoke test (production server, port 3102):
+  `/dashboard`, `/jobs`, `/clients`, `/vendors`, `/crew`, `/venues`,
+  `/finance` → HTTP 200; HTML terverifikasi **tidak** mengandung mock data
+  ("Andrea", "JOB-2026"); `/jobs/JOB-2026-001` merender halaman
+  not-found/empty karena data kosong — tanpa exception.
+
+## 9. Security
+
+- Tidak ada `GOOGLE_PRIVATE_KEY`, access token, JWT, atau credential di
+  source code, audit, README, maupun output log.
+- `.env.local` tetap ignored Git; credential handling Phase 2A–2D tidak diubah.
+
+## 10. Scope Check
+
+- CRUD write: **BELUM** (tidak ada append/update/delete/insert/worksheet baru).
+- UI redesign: **BELUM**. Authentication/role: **BELUM**.
+- Tidak ada fitur baru di luar rekonsiliasi schema Phase 2E.
+- `admins.password_hash` tetap tidak diekspos ke domain.
+
+## 11. Definition of Done Phase 2E
+
+- [x] Schema mismatch diaudit field-by-field
+- [x] Business field tidak hilang diam-diam; field business dipertahankan end-to-end
+- [x] `admins.password_hash` tetap tidak dipetakan
+- [x] Metadata `created_at`/`updated_at` tidak dipaksakan ke domain
+- [x] Mapper membaca field business baru
+- [x] Mock repository tetap valid
+- [x] Kontrak `DataRepositories` konsisten
+- [x] `getRepositories()` → `googleRepositories`
+- [x] Service tetap jadi jembatan; tidak ada UI akses Google langsung
+- [x] Tidak ada operasi write; spreadsheet tetap hanya header
+- [x] Aplikasi tidak crash saat spreadsheet kosong; empty state tampil
+- [x] tsc/eslint/build PASS; smoke test route utama PASS
+- [x] Tidak ada secret bocor
+- [x] Audit diperbarui
+
+Status akhir: **PHASE 2E — COMPLETED**.

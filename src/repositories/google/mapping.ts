@@ -30,7 +30,12 @@ import type {
  * - Number wajib harus angka valid; kosong/NaN → error eksplisit.
  * - String opsional kosong → undefined; tanpa menggeser kolom.
  * - Kolom sheet tanpa padanan field domain tidak dibawa (didokumentasikan
- *   di audit, bukan di diam-diam dibuang secara silent).
+ *   di audit, bukan di diam-diam dibuang secara silent). Sejak Phase 2E,
+ *   field business yang hilang (address, contact, location, delivery_type,
+ *   quantity, payment_status, notes) sudah ditambahkan ke domain dan
+ *   dipetakan. Yang sengaja tidak dibawa: metadata `created_at`/`updated_at`
+ *   di luar `Job` (tidak ada kebutuhan service/UI) dan
+ *   `admins.password_hash` (authentication belum scope).
  */
 
 export const SHEET_TITLES = [
@@ -125,6 +130,38 @@ function requiredNumber(rec: Record<string, string>, key: string, sheet: SheetTi
   return n;
 }
 
+function optionalNumber(rec: Record<string, string>, key: string, sheet: SheetTitle, rowNumber: number): number | undefined {
+  const raw = rec[key];
+  if (raw === undefined || raw === "") {
+    return undefined;
+  }
+  const n = Number(raw.replace(/[.,](?=\d{3}\b)/g, "").replace(/,/g, "."));
+  if (!Number.isFinite(n)) {
+    throw new SheetMappingError(`Angka tidak valid '${raw}' pada ${ctx(sheet, rowNumber, key)}.`);
+  }
+  return n;
+}
+
+function optionalEnum<T extends string>(
+  rec: Record<string, string>,
+  key: string,
+  allowed: readonly T[],
+  sheet: SheetTitle,
+  rowNumber: number,
+): T | undefined {
+  const raw = rec[key];
+  if (raw === undefined || raw === "") {
+    return undefined;
+  }
+  const normalized = normalizeEnum(raw) as T;
+  if (!allowed.includes(normalized)) {
+    throw new SheetMappingError(
+      `Nilai '${raw}' tidak valid pada ${ctx(sheet, rowNumber, key)}. Nilai yang diizinkan: ${allowed.join(", ")}.`,
+    );
+  }
+  return normalized;
+}
+
 function normalizeEnum(raw: string): string {
   return raw.trim().toUpperCase().replace(/[\s-]+/g, "_");
 }
@@ -161,6 +198,7 @@ export function mapClient(rec: Record<string, string>, sheet: SheetTitle, rowNum
     id: requiredString(rec, "id", sheet, rowNumber),
     name: requiredString(rec, "name", sheet, rowNumber),
     phone: optionalString(rec, "contact"),
+    address: optionalString(rec, "address"),
     notes: optionalString(rec, "notes"),
   };
 }
@@ -179,6 +217,7 @@ export function mapVenue(rec: Record<string, string>, sheet: SheetTitle, rowNumb
     id: requiredString(rec, "id", sheet, rowNumber),
     name: requiredString(rec, "name", sheet, rowNumber),
     address: optionalString(rec, "address"),
+    contact: optionalString(rec, "contact"),
     notes: optionalString(rec, "notes"),
   };
 }
@@ -190,6 +229,7 @@ export function mapCrew(rec: Record<string, string>, sheet: SheetTitle, rowNumbe
     role: requiredString(rec, "role", sheet, rowNumber),
     phone: optionalString(rec, "contact"),
     defaultPayment: requiredNumber(rec, "default_payment", sheet, rowNumber),
+    notes: optionalString(rec, "notes"),
   };
 }
 
@@ -204,6 +244,7 @@ export function mapJob(rec: Record<string, string>, sheet: SheetTitle, rowNumber
     venueId: optionalString(rec, "venue_id"),
     executionDate: requiredString(rec, "execution_date", sheet, rowNumber),
     status: requiredEnum(rec, "status", JOB_STATUSES, sheet, rowNumber),
+    location: optionalString(rec, "location"),
     notes: optionalString(rec, "description"),
     createdAt: requiredString(rec, "created_at", sheet, rowNumber),
     updatedAt: requiredString(rec, "updated_at", sheet, rowNumber),
@@ -217,6 +258,7 @@ export function mapJobCrew(rec: Record<string, string>, sheet: SheetTitle, rowNu
     crewId: requiredString(rec, "crew_id", sheet, rowNumber),
     role: requiredString(rec, "role", sheet, rowNumber),
     actualPayment: requiredNumber(rec, "payment", sheet, rowNumber),
+    paymentStatus: optionalEnum(rec, "payment_status", PAYMENT_STATUSES, sheet, rowNumber),
   };
 }
 
@@ -225,6 +267,8 @@ export function mapDelivery(rec: Record<string, string>, sheet: SheetTitle, rowN
     id: requiredString(rec, "id", sheet, rowNumber),
     jobId: requiredString(rec, "job_id", sheet, rowNumber),
     name: requiredString(rec, "item_name", sheet, rowNumber),
+    deliveryType: optionalString(rec, "delivery_type"),
+    quantity: optionalNumber(rec, "quantity", sheet, rowNumber),
     deadline: requiredString(rec, "deadline", sheet, rowNumber),
     status: requiredEnum(rec, "status", DELIVERY_STATUSES, sheet, rowNumber),
     notes: optionalString(rec, "notes"),
@@ -240,6 +284,7 @@ export function mapClientPayment(rec: Record<string, string>, sheet: SheetTitle,
     dueDate: optionalString(rec, "due_date"),
     paidDate: optionalString(rec, "paid_date"),
     status: requiredEnum(rec, "status", PAYMENT_STATUSES, sheet, rowNumber),
+    notes: optionalString(rec, "notes"),
   };
 }
 
@@ -252,6 +297,7 @@ export function mapVendorPayment(rec: Record<string, string>, sheet: SheetTitle,
     dueDate: optionalString(rec, "due_date"),
     paidDate: optionalString(rec, "paid_date"),
     status: requiredEnum(rec, "status", PAYMENT_STATUSES, sheet, rowNumber),
+    notes: optionalString(rec, "notes"),
   };
 }
 
@@ -263,6 +309,7 @@ export function mapExpense(rec: Record<string, string>, sheet: SheetTitle, rowNu
     category: requiredString(rec, "category", sheet, rowNumber),
     amount: requiredNumber(rec, "amount", sheet, rowNumber),
     date: requiredString(rec, "expense_date", sheet, rowNumber),
+    notes: optionalString(rec, "notes"),
   };
 }
 

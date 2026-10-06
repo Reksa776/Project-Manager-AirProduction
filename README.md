@@ -2,8 +2,9 @@
 
 Sistem manajemen operasional internal untuk production/documentation business.
 
-> Status saat ini: **Phase 0 + Phase 1 (UI Foundation)**.
-> Data masih berasal dari **mock**. Google Sheets **belum** diimplementasikan.
+> Status saat ini: **Phase 2E**.
+> Data aktif berasal dari **Google Sheets** (read-only). Mock repository
+> tetap tersedia sebagai fallback/testing di `src/repositories/mock`.
 
 ## Menjalankan Project
 
@@ -49,7 +50,7 @@ src/
 │   └── icons.tsx        # Ikon SVG internal
 ├── data/mock/           # Mock data (sementara)
 ├── lib/                 # Tipe domain, label, util, navigasi
-├── repositories/        # Kontrak repository + implementasi mock
+├── repositories/        # Kontrak repository + implementasi mock & Google
 └── services/            # Logic baca data untuk UI
 ```
 
@@ -62,7 +63,7 @@ Service (services/)
       ↓
 Repository (repositories/)
       ↓
-Google Sheets  ← belum diimplementasikan (Phase 1 masih mock)
+Google Sheets  ← sumber data aktif (read-only, via googleRepositories)
 ```
 
 UI hanya bergantung pada Service. Service hanya bergantung pada kontrak
