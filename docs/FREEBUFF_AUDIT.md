@@ -1018,3 +1018,207 @@ lain. Phase 2C hanya operasi baca metadata; **tidak ada write operation**.
 - [x] Audit diperbarui
 
 Status akhir: **PHASE 2C — COMPLETED**.
+
+---
+
+# FREEBUFF AUDIT — PHASE 2D (GOOGLE SHEETS REPOSITORY READ)
+
+## 1. Status
+
+**COMPLETED**
+
+## 2. File yang Dibuat/Diubah
+
+- **Baru:** `src/repositories/google/mapping.ts` — header registry, header
+  validation, row → record, normalisasi string kosong, parsing number,
+  normalisasi + validasi enum, dan mapper per entity (Client, Vendor, Venue,
+  Crew, Job, JobCrew, Delivery, ClientPayment, VendorPayment, Expense, Admin).
+- **Baru:** `src/repositories/google/index.ts` — `googleRepositories`
+  yang mengimplementasikan kontrak `DataRepositories` existing.
+- **Tidak diubah:** `src/services/*`, `src/repositories/mock/*`,
+  `src/repositories/index.ts` (`getRepositories()` tetap mock),
+  `src/repositories/types.ts`, `src/data/mock/*`, `src/components/*`,
+  `src/app/*`, `src/lib/google-sheets/client.ts`, `package.json`.
+- Dependency baru: **tidak ada** (googleapis sudah terpasang dari Phase 2C).
+
+## 3. Repository Google yang Dibuat
+
+`googleRepositories` (`src/repositories/google/index.ts`):
+
+- Memenuhi `DataRepositories` existing — tidak ada kontrak baru.
+- `jobs`: `getAll`, `getById`, `getByJobNumber`.
+- `clients`/`vendors`/`venues`/`crew`/`admins`: `getAll`, `getById`.
+- `deliveries`/`jobCrews`/`clientPayments`/`vendorPayments`/`expenses`:
+  `getAll`, `getById`, `getByJobId`.
+- Setiap pemanggilan membaca ulang worksheet (read-only, tanpa cache, tanpa
+  ID generation, tanpa dedup otomatis).
+
+## 4. Worksheet yang Didukung
+
+Semua 11 worksheet Phase 2B didukung penuh: `clients`, `vendors`, `venues`,
+`crew`, `jobs`, `job_crews`, `deliveries`, `client_payments`,
+`vendor_payments`, `expenses`, `admins`.
+
+## 5. Penggunaan Google Sheets Client
+
+- Memakai `getSheetsClient()`, `getSpreadsheetId()` dari
+  `src/lib/google-sheets/client.ts`. Tidak ada duplikasi autentikasi, tidak
+  ada credential handling baru, tidak ada client kedua.
+- Hanya `spreadsheets.values.get` (read-only). Tidak ada append, update,
+  delete, clear, atau batchUpdate.
+
+## 6. Header → Domain Mapping
+
+Mapping dibangun dari **header row sebagai sumber** (`rowToRecord` men-zip
+nama kolom dengan indeks cell; cell kosong/kurang tidak menggeser kolom).
+`validateHeaders` menolak header yang tidak sesuai dengan schema Phase 2B
+dengan error eksplisit.
+
+Pemetaan field (ringkasan, detail di `mapping.ts`):
+
+- `clients`: id→id, name→name, contact→phone, notes→notes. `address`,
+  `created_at`, `updated_at` tidak punya padanan di `Client` (tidak dibawa).
+- `vendors`: id→id, name→name, contact→phone, notes→notes. `created_at`,
+  `updated_at` tidak dibawa.
+- `venues`: id→id, name→name, address→address, notes→notes. `contact`,
+  `created_at`, `updated_at` tidak dibawa.
+- `crew`: id→id, name→name, role→role, contact→phone,
+  default_payment→defaultPayment (number). `notes`, `created_at`,
+  `updated_at` tidak dibawa.
+- `jobs`: id→id, job_number→jobNumber, job_name→jobName,
+  job_type→category (enum, dinormalisasi), client_id→clientId,
+  vendor_id→vendorId, venue_id→venueId, execution_date→executionDate,
+  status→status (enum), description→notes, created_at→createdAt,
+  updated_at→updatedAt. `location` tidak dibawa.
+- `job_crews`: id→id, job_id→jobId, crew_id→crewId, role→role,
+  payment→actualPayment (number). `payment_status`, `created_at`,
+  `updated_at` tidak dibawa.
+- `deliveries`: id→id, job_id→jobId, item_name→name, deadline→deadline,
+  status→status (enum), notes→notes. `delivery_type`, `quantity`,
+  `created_at`, `updated_at` tidak dibawa.
+- `client_payments`: id→id, job_id→jobId, term→term (enum),
+  amount→amount (number), due_date→dueDate, paid_date→paidDate,
+  status→status (enum). `notes`, `created_at`, `updated_at` tidak dibawa.
+- `vendor_payments`: id→id, job_id→jobId, type→type (enum DP/PELUNASAN),
+  amount→amount, due_date→dueDate, paid_date→paidDate, status→status.
+  Sisanya tidak dibawa.
+- `expenses`: id→id, job_id→jobId, description→description,
+  category→category, amount→amount, expense_date→date. `notes`,
+  `created_at`, `updated_at` tidak dibawa.
+- `admins`: id→id, name→name, email→email. `password_hash` sengaja TIDAK
+  dibawa ke domain (tidak ada field padanan; tidak diekspos ke UI/service).
+
+Keputusan ini didokumentasikan karena schema sheet (Phase 2B) dan domain type
+(Phase 1) tidak 1:1. Kolom tanpa padanan di-drop secara eksplisit dan tercatat
+di sini, bukan secara silent. Perataan schema sheet ↔ domain adalah kandidat
+pekerjaan Phase 2E+ bila diperlukan.
+
+## 7. Aturan Normalisasi
+
+- String kosong → `undefined` untuk field opsional; error eksplisit untuk
+  field wajib (`id`, `name`, dst.).
+- Number wajib: angka valid (mendukung pemisah ribuan `1.500.000` / `1,500,000`);
+  kosong/NaN → error eksplisit, tidak pernah `NaN`, tidak ada default `0` diam-diam.
+- Enum: dinormalisasi (`trim`, uppercase, spasi/strip → underscore) lalu
+  divalidasi terhadap type existing (`JobStatus`, `DeliveryStatus`,
+  `PaymentStatus`, `JobCategory`, `ClientPaymentTerm`, `VendorPaymentType`).
+  Nilai tidak valid → error eksplisit dengan konteks worksheet/baris/kolom.
+- Date: dipakai apa adanya sebagai string sesuai representasi project
+  (`YYYY-MM-DD` pada mock); tidak dikarang dan tidak divalidasi ulang di
+  repository.
+- ID dan `job_number` dipertahankan apa adanya; tidak ada generate ID, tidak
+  ada dedup otomatis.
+- Job invariant (Client ATAU Vendor) **tidak** diperbaiki/dinormalisasi oleh
+  repository — konsisten dengan mock repository; validasi berada di service
+  layer (`resolveCounterparty`).
+
+## 8. Error Handling
+
+- Env invalid / auth gagal / spreadsheet tidak dapat diakses / worksheet tidak
+  ditemukan / header tidak sesuai → error berisi konteks repository, worksheet,
+  dan operasi `read`. Tidak pernah mengembalikan data palsu/silent.
+- Pesan error tidak memuat private key, access token, atau credential.
+
+## 9. Hasil Verification
+
+Menggunakan skrip sementara di luar repository (node strip-types + alias
+loader) yang mengimpor module repository TERSEBUT dan membaca spreadsheet
+nyata:
+
+- Import google repository: PASS (11 key repository).
+- `getAll()` pada 11 worksheet: **semua `[]`** (worksheet hanya berisi header) — PASS.
+- `jobs.getByJobNumber` → `null`, `jobs.getById` → `null`,
+  `jobCrews.getByJobId` → `[]`, `clientPayments.getByJobId` → `[]` — PASS.
+- Mapper synthetic (tanpa write): enum normalisasi, number parsing
+  (`1.500.000` → 1500000), paid_date kosong → undefined, status invalid →
+  error, NaN → error, empty row terdeteksi, zip tanpa geser kolom, header
+  mismatch → error, job invariant tidak disilent-fix — semua PASS.
+- Spreadsheet tidak ditulis/diubah apa pun selama verification.
+
+## 10. Read-Only Guarantee
+
+- Tidak ada operasi C/U/D; tidak ada `batchUpdate`, append, update, delete,
+  clear. Hanya `spreadsheets.values.get`.
+- Scope client tetap `spreadsheets.readonly`.
+
+## 11. Security Check
+
+- `.env.local` tetap ignored Git.
+- Tidak ada private key/token/credential di source, audit, README, terminal,
+  atau git diff.
+- `git grep` untuk pola `BEGIN PRIVATE KEY`, `private_key`, `access_token`,
+  `AIza` pada `src/` dan `package.json`: 0 kemunculan.
+
+## 12. Validation Project
+
+- TypeScript: **PASS** — `npx tsc --noEmit` exit code 0.
+- ESLint: **PASS** — `npx eslint .` exit code 0 (1 warning unused import
+  dibersihkan).
+- Build: **PASS** — `npm run build` exit code 0, 11 route.
+
+## 13. Yang Sengaja TIDAK Dilakukan
+
+- Tidak mengubah `getRepositories()` — masih `mockRepositories`.
+- Tidak mengubah `src/services/*`, `src/components/*`, `src/app/*`,
+  `src/data/mock/*`, `src/repositories/mock/*`, `src/repositories/index.ts`.
+- Tidak membuat CRUD/write, UI, endpoint, integrasi service, atau koneksi
+  repository Google ke service (Phase 2E).
+- Tidak menambah dependency.
+- Tidak memasukkan data dummy ke spreadsheet.
+
+## 14. Catatan untuk Phase 2E
+
+- `getRepositories()` akan beralih ke `googleRepositories`; service tetap
+  memakai kontrak yang sama sehingga tidak perlu diubah.
+- Schema sheet ↔ domain belum 1:1 (lihat bagian 6); bila data asli memakai
+  kolom yang belum terpetakan (`location`, `address` client, `delivery_type`,
+  `quantity`, dst.), perlu keputusan apakah domain type diperluas atau sheet
+  disesuaikan.
+- Mapper enum mengasumsikan nilai sheet sudah dalam domain enum setelah
+  normalisasi; nilai seperti "Belum Dikerjakan" akan error eksplisit — perlu
+  disepakati format penulisan worker/admin di sheet.
+
+## 15. Definition of Done Phase 2D
+
+- [x] Google Sheets repository read-only dibuat
+- [x] Mengikuti contract existing (`DataRepositories`)
+- [x] Menggunakan `src/lib/google-sheets/client.ts`
+- [x] Tidak ada duplicate authentication
+- [x] Semua 11 worksheet didukung
+- [x] Header → domain mapping benar (berbasis nama header)
+- [x] Empty worksheet menghasilkan `[]`
+- [x] Empty rows ditangani (diskip tanpa object palsu)
+- [x] Numeric/date/enum mengikuti existing types
+- [x] Tidak ada ID generation saat read
+- [x] Tidak ada silent business-rule invention
+- [x] Job invariant tidak diam-diam diperbaiki
+- [x] Tidak ada operasi write / CRUD
+- [x] Tidak ada perubahan UI / service / mock
+- [x] `getRepositories()` tetap mock
+- [x] Verification spreadsheet nyata berhasil (11/11 `[]`)
+- [x] Mapper verification berhasil tanpa menulis data
+- [x] Tidak ada secret leakage
+- [x] tsc PASS, eslint PASS, build PASS
+- [x] Audit diperbarui
+
+Status akhir: **PHASE 2D — COMPLETED**.
