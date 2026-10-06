@@ -677,3 +677,344 @@ platform deployment, sehingga tidak perlu menyimpan JSON key jangka panjang.
   saat client benar-benar dibutuhkan, bukan sekarang.
 - Karena `GOOGLE_PRIVATE_KEY` berisi karakter baris baru, pembacaan nilainya nanti
   perlu mengganti `\n` menjadi baris baru yang sebenarnya sebelum dipakai library auth.
+
+---
+
+# FREEBUFF AUDIT — PHASE 2A (VERIFIKASI ULANG OLEH OPENCODE)
+
+## 1. Status
+
+**COMPLETED**
+
+Verifikasi ulang Phase 2A dilakukan setelah Freebuff terkena usage limit.
+Seluruh item Definition of Done terpenuhi. Worktree bersih: tidak ada perubahan
+source code, service, mock data, business rules, `getRepositories()`, UI,
+maupun `src/repositories/index.ts`.
+
+## 2. Google Cloud
+
+- Google Cloud Project: **tersedia** — terbukti karena Service Account dapat
+  menerbitkan access token dan API Sheets merespons.
+- Google Sheets API: **tersedia dan berfungsi** — token exchange HTTP 200 dan
+  pemanggilan metadata spreadsheet (`spreadsheets.get`, fields terbatas) HTTP 200.
+- Service Account: **tersedia** — JWT berhasil ditukar menjadi access token
+  (HTTP 200, `token_type: Bearer`, `expires_in` ~3599 detik).
+- Spreadsheet tujuan: **dapat diakses** — metadata GET HTTP 200, judul
+  spreadsheet "Air Production DB". Spreadsheet sudah dibagikan ke email
+  Service Account (terbukti dari akses sukses).
+- Tidak ada spreadsheet/worksheet baru yang dibuat; tidak ada data yang ditulis.
+
+## 3. Environment Variable (tanpa menampilkan nilai/secret)
+
+- `GOOGLE_SHEETS_ID` — **tersedia**, non-kosong. Catatan faktual: nilainya
+  saat ini berupa **URL lengkap** spreadsheet (mengandung `docs.google.com`
+  dan `/d/`), bukan hanya ID mentah. Bisa dipakai langsung dengan mengekstrak
+  bagian `/d/<id>/`, atau user dapat menggantinya dengan ID mentah saja pada
+  Phase 2B. Bukan pemblokir.
+- `GOOGLE_SERVICE_ACCOUNT_EMAIL` — **tersedia**, non-kosong, berformat
+  `<nama>@<project-id>.iam.gserviceaccount.com` (bukan placeholder).
+- `GOOGLE_PRIVATE_KEY` — **tersedia**, non-kosong, diawali marker
+  `-----BEGIN PRIVATE KEY-----` dan mengandung `\n` ter-escape. Nilai tidak
+  pernah ditampilkan di mana pun.
+- `.env.example` — **placeholder saja** (variabel kosong + komentar), tanpa
+  nilai asli. Ikut Git.
+- `.env.local` — **tidak tracked Git** (terverifikasi `git check-ignore` →
+  rule `.gitignore:34:.env*`), tidak muncul di `git status`.
+
+## 4. Security Check
+
+- Tidak ada credential/secret di source code: pencarian `BEGIN PRIVATE KEY`,
+  `private_key`, `client_email`, `gserviceaccount` pada seluruh file tracked
+  menghasilkan **0** kemunculan berisi key asli (hanya teks panduan di audit).
+- Tidak ada credential/secret di git history: `git log --all -p` untuk pola
+  header private key asli dan API key menghasilkan **0** kemunculan.
+- `GOOGLE_*` **tidak** dibaca oleh source code mana pun (`src/` tidak
+  mereferensikan `process.env.GOOGLE_*`), dan belum ada dependency Google
+  (`googleapis`/`google-auth-library`) di `package.json`.
+- `getRepositories()` masih mengembalikan `mockRepositories` (diverifikasi
+  langsung pada `src/repositories/index.ts`).
+
+## 5. Verifikasi Autentikasi Google (faktual)
+
+Metode: JWT RS256 ditandatangani dengan `GOOGLE_PRIVATE_KEY` (Node `crypto`,
+tanpa menambah dependency apa pun), ditukar ke access token via endpoint resmi
+`https://oauth2.googleapis.com/token`, lalu dipakai untuk GET metadata
+spreadsheet dengan scope `spreadsheets.readonly`. Script bersifat sementara,
+berada di luar repository, dan nilai token tidak dicetak.
+
+Hasil:
+
+- Token exchange: **HTTP 200 — BERHASIL** (Bearer, expires_in ~3599).
+- Metadata spreadsheet (`fields=spreadsheetId,properties.title`): **HTTP 200**,
+  judul "Air Production DB" — akses read-only terkonfirmasi.
+- Artefak: script verifikasi **tidak masuk repository** (di luar folder project).
+
+## 6. Validation
+
+- TypeScript: **PASS** — `npx tsc --noEmit` exit code 0.
+- ESLint: **PASS** — `npx eslint .` exit code 0, tanpa warning.
+- Build: **PASS** — `npm run build` exit code 0, 11 route ter-generate,
+  environment `.env.local` termuat tanpa error.
+- `git status --short` bersih; tidak ada perubahan pada `src/`,
+  `package.json`, maupun konfigurasi lain.
+
+## 7. Yang Belum Dikerjakan / Belum Diverifikasi
+
+- Daftar worksheet aktual di dalam spreadsheet (belum diinspeksi; bukan
+  kebutuhan Phase 2A).
+- Operasi tulis (write) sama sekali belum diverifikasi (sesuai instruksi).
+- Repository Google Sheets, CRUD, endpoint API, dan integrasi ke
+  `getRepositories()`: **belum dibuat** (Phase 2B).
+- Dependency Google API: **belum ditambahkan** (sesuai instruksi).
+- Penyesuaian `GOOGLE_SHEETS_ID` menjadi ID mentah (opsional, Phase 2B).
+
+## 8. Definition of Done Phase 2A
+
+- [x] Google Cloud Project tersedia
+- [x] Google Sheets API tersedia
+- [x] Service Account tersedia
+- [x] GOOGLE_SHEETS_ID tersedia
+- [x] GOOGLE_SERVICE_ACCOUNT_EMAIL tersedia
+- [x] GOOGLE_PRIVATE_KEY tersedia
+- [x] Tidak ada secret bocor ke repository
+- [x] Tidak ada secret bocor ke git history
+- [x] .env.local tidak tracked
+- [x] tsc PASS
+- [x] eslint PASS
+- [x] build PASS
+
+Status akhir: **PHASE 2A — COMPLETED**.
+
+---
+
+# FREEBUFF AUDIT — PHASE 2B (GOOGLE SPREADSHEET STRUCTURE)
+
+## 1. Status
+
+**COMPLETED**
+
+## 2. Spreadsheet yang Digunakan
+
+- Nama: **Air Production DB** (spreadsheet yang sudah ada, tidak membuat baru).
+- Akses: Service Account dapat membaca metadata dan menulis header (HTTP 200).
+- `GOOGLE_SHEETS_ID` pada `.env.local` telah **dinormalisasi menjadi ID mentah**
+  (sebelumnya berisi URL lengkap; bagian `/d/<id>/` diekstrak). Nilai tidak
+  ditampilkan di audit ini.
+
+## 3. Worksheet
+
+Tepat 11 worksheet, tanpa duplikat, tanpa worksheet tambahan:
+
+1. `clients`
+2. `vendors`
+3. `venues`
+4. `crew`
+5. `jobs`
+6. `job_crews`
+7. `deliveries`
+8. `client_payments`
+9. `vendor_payments`
+10. `expenses`
+11. `admins`
+
+Semua worksheet tersebut **sudah ada** sebelum setup (dibuat user sebelumnya)
+dengan nama yang tepat dan kondisi kosong. Tidak ada worksheet yang dibuat
+ulang dan tidak ada duplikat. Hanya header baris pertama yang diisi.
+
+## 4. Header per Worksheet
+
+- `clients`: id, name, address, contact, notes, created_at, updated_at
+- `vendors`: id, name, contact, notes, created_at, updated_at
+- `venues`: id, name, address, contact, notes, created_at, updated_at
+- `crew`: id, name, role, contact, default_payment, notes, created_at, updated_at
+- `jobs`: id, job_number, client_id, vendor_id, venue_id, job_name, job_type,
+  execution_date, location, status, description, created_at, updated_at
+- `job_crews`: id, job_id, crew_id, role, payment, payment_status, created_at, updated_at
+- `deliveries`: id, job_id, item_name, delivery_type, quantity, deadline, status,
+  notes, created_at, updated_at
+- `client_payments`: id, job_id, term, amount, due_date, paid_date, status, notes,
+  created_at, updated_at
+- `vendor_payments`: id, job_id, type, amount, due_date, paid_date, status, notes,
+  created_at, updated_at
+- `expenses`: id, job_id, category, description, amount, expense_date, notes,
+  created_at, updated_at
+- `admins`: id, name, email, password_hash, created_at, updated_at
+
+## 5. Data
+
+- **Tidak ada** mock data dan **tidak ada** data dummy di spreadsheet.
+- Setiap worksheet hanya berisi 1 baris (header). Terverifikasi lewat pembacaan
+  `values` pada setiap sheet: `jumlah baris terisi: 1`.
+- Mock data di repository (`src/data/mock/*`) tidak diubah.
+
+## 6. Hasil Verifikasi Struktur (read-only, programmatic)
+
+- Spreadsheet dapat diakses: HTTP 200.
+- Jumlah worksheet: 11 — cocok.
+- Nama worksheet: tepat, tanpa duplikat, tanpa tambahan.
+- Header setiap worksheet: cocok persis dengan spesifikasi (11/11 `header cocok: true`).
+- Data tambahan di luar header: tidak ada (11/11 `tanpa data tambahan: true`).
+- Hasil akhir skrip verifikasi: `VERIFIKASI STRUKTUR: LULUS`.
+
+## 7. Perubahan File Repository
+
+- `.env.local` — diubah (normalisasi `GOOGLE_SHEETS_ID` ke ID mentah).
+  File ini **tetap tidak tracked** Git (`git check-ignore` → `.gitignore:34:.env*`).
+- `docs/FREEBUFF_AUDIT.md` — diperbarui (audit ini).
+- `src/services/*`, `src/repositories/*`, `src/data/mock/*`, `src/components/*`,
+  `src/app/*`, `package.json` — **tidak berubah** (terverifikasi dengan
+  `git status`/`git diff`).
+- Dependency baru: **tidak ada**. Setup/verifikasi memakai skrip Node sementara
+  di luar repository (JWT + `fetch` bawaan), tanpa `googleapis`.
+- Belum ada Google Sheets client untuk aplikasi, belum ada repository Google
+  Sheets, `getRepositories()` tetap mock, belum ada CRUD/endpoint/UI baru.
+
+## 8. Security
+
+- `GOOGLE_PRIVATE_KEY`, access token, dan credential tidak pernah dicetak,
+  tidak masuk audit, tidak masuk source code, tidak masuk Git.
+- `.env.local` tetap diabaikan Git; tidak ada file credential JSON di repository.
+
+## 9. Validation Project
+
+- TypeScript: **PASS** — `npx tsc --noEmit` exit code 0.
+- ESLint: **PASS** — `npx eslint .` exit code 0, tanpa warning.
+- Build: **PASS** — `npm run build` exit code 0, 11 route ter-generate.
+
+## 10. Definition of Done Phase 2B
+
+- [x] Spreadsheet "Air Production DB" digunakan
+- [x] 11 worksheet tersedia
+- [x] Nama worksheet tepat
+- [x] Header setiap worksheet tepat
+- [x] Tidak ada worksheet duplikat
+- [x] Tidak ada mock/dummy data di spreadsheet
+- [x] Service Account dapat mengakses spreadsheet
+- [x] Tidak ada secret bocor
+- [x] tsc PASS
+- [x] eslint PASS
+- [x] build PASS
+- [x] Audit diperbarui
+
+Status akhir: **PHASE 2B — COMPLETED**.
+
+---
+
+# FREEBUFF AUDIT — PHASE 2C (GOOGLE SHEETS CLIENT)
+
+## 1. Status
+
+**COMPLETED**
+
+## 2. Dependency
+
+- Ditambahkan: `googleapis` ^183.0.0 (di `dependencies`).
+  `google-auth-library` ikut terpasang sebagai dependency transitif `googleapis`.
+- `package-lock.json` diperbarui dan konsisten dengan `package.json`.
+- Tidak ada dependency UI atau dependency lain yang tidak berkaitan.
+
+## 3. Lokasi Client
+
+`src/lib/google-sheets/client.ts` — terpusat. Tidak mencampur repository,
+mapping domain, maupun business logic.
+
+Fungsi yang disediakan:
+
+- `getGoogleSheetsConfig()` — baca + validasi env, normalisasi ID dan key.
+- `getGoogleAuth()` — JWT Service Account.
+- `getSheetsClient()` — Google Sheets API v4 client.
+- `getSpreadsheetId()` — ID spreadsheet aktif.
+- `extractSpreadsheetId()` — menerima ID mentah maupun URL lengkap.
+- `normalizePrivateKey()` — membuang kutip pembungkus dan mengubah `\n`
+  ter-escape menjadi newline aktual.
+
+## 4. Authentication & Konfigurasi
+
+- Metode: Service Account via `google.auth.JWT` (googleapis).
+- Environment variable yang digunakan (nama saja): `GOOGLE_SHEETS_ID`,
+  `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY`.
+- Private key dinormalisasi: kutip pembungkus dibuang, `\n` menjadi newline
+  asli sebelum diberikan ke library auth.
+- Validasi jelas: env kosong → error deskriptif; `GOOGLE_SHEETS_ID` tidak bisa
+  diekstrak → error; email tidak berformat `@` → error; key tanpa marker
+  `-----BEGIN PRIVATE KEY-----` → error. Tidak ada fallback ke mock, tidak ada
+  credential hardcoded, dan pesan error tidak memuat nilai credential.
+
+## 5. Server-Only Boundary
+
+- Modul tidak memiliki directive `"use client"`.
+- Tidak ada variabel `NEXT_PUBLIC_*` (satu-satunya kemunculan hanya pada
+  komentar dokumentasi).
+- Client tidak diimpor dari Client Component mana pun.
+- Mock data/UI tidak menyentuh client ini; aplikasi tetap memakai mock.
+
+## 6. Scope Google API
+
+`https://www.googleapis.com/auth/spreadsheets.readonly` — minimum untuk
+membaca metadata spreadsheet pada Phase 2C. Tidak ada scope Drive atau scope
+lain. Phase 2C hanya operasi baca metadata; **tidak ada write operation**.
+
+## 7. Hasil Verifikasi (memakai modul client TERSEBUT, via node strip-types)
+
+- config validation: PASS
+- authentication: PASS (access token diterima dari Google)
+- sheets client: PASS
+- spreadsheet metadata: PASS
+- spreadsheet title: Air Production DB
+- worksheet count: 11 (PASS, tidak berubah, tanpa write)
+
+## 8. Repository Boundary
+
+- Tidak dibuat `src/repositories/google/*`, tidak ada repository CRUD,
+  tidak ada mapping domain entity, tidak ada switch `getRepositories()`.
+- `getRepositories()` tetap mengembalikan `mockRepositories`
+  (terverifikasi pada `src/repositories/index.ts`).
+- `src/services/*`, `src/repositories/*`, `src/data/mock/*`,
+  `src/components/*`, `src/app/*`: **tidak berubah** (git diff bersih untuk
+  semua path tersebut).
+- Mock repository tetap aktif; aplikasi setelah Phase 2C masih menampilkan
+  mock data.
+
+## 9. Security Check
+
+- `.env.local` tetap ignored Git (`git check-ignore` aktif).
+- Tidak ada private key di source code; tidak ada credential JSON di repo;
+  tidak ada access token di repo.
+- Audit, README, dan terminal tidak pernah mencetak private key, access token,
+  credential JSON, maupun ID spreadsheet.
+- Error config tidak membocorkan nilai env.
+
+## 10. Validation Project
+
+- TypeScript: **PASS** — `npx tsc --noEmit` exit code 0
+  (sebelumnya 2 error regex `/s` flag pada target es2017, sudah diperbaiki
+  dengan ekuivalen `[\s\S]`).
+- ESLint: **PASS** — `npx eslint .` exit code 0, tanpa warning.
+- Build: **PASS** — `npm run build` exit code 0, 11 route ter-generate.
+
+## 11. Definition of Done Phase 2C
+
+- [x] Google dependency yang diperlukan ditambahkan (`googleapis`)
+- [x] Google Sheets Client dibuat (`src/lib/google-sheets/client.ts`)
+- [x] Service Account authentication berhasil
+- [x] GOOGLE_SHEETS_ID berhasil digunakan
+- [x] GOOGLE_SERVICE_ACCOUNT_EMAIL berhasil digunakan
+- [x] GOOGLE_PRIVATE_KEY berhasil digunakan
+- [x] Escaped newline private key ditangani (`normalizePrivateKey`)
+- [x] Client bersifat server-only (tanpa "use client", tanpa NEXT_PUBLIC_*)
+- [x] Google Sheets API dapat diakses
+- [x] Spreadsheet "Air Production DB" dapat dibaca
+- [x] 11 worksheet dapat diverifikasi
+- [x] Tidak ada write operation
+- [x] Tidak ada repository Google Sheets
+- [x] getRepositories() masih mock
+- [x] Service tidak berubah
+- [x] UI tidak berubah
+- [x] Mock data tidak berubah
+- [x] Tidak ada secret bocor
+- [x] tsc PASS
+- [x] eslint PASS
+- [x] build PASS
+- [x] Audit diperbarui
+
+Status akhir: **PHASE 2C — COMPLETED**.
