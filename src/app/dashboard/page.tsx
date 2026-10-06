@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import { SummaryCard } from "@/components/dashboard/summary-card";
-import { Icon } from "@/components/icons";
 import {
   Card,
   CardHeader,
@@ -28,39 +27,33 @@ export default async function DashboardPage() {
     await getDashboardData();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         title="Dashboard"
-        description="Ringkasan operasional Air Production: pekerjaan aktif, jadwal wedding terdekat, dan daftar editing yang harus diselesaikan."
+        description="Ringkasan operasional Air Production: pekerjaan aktif, jadwal wedding terdekat, dan delivery yang harus diselesaikan."
       />
 
+      {/* Ringkasan job sekaligus status job dalam satu baris yang ringkas. */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           label="Total Jobs"
           value={summary.totalJobs}
-          icon="jobs"
-          hint="Seluruh pekerjaan yang tercatat"
+          hint="Seluruh pekerjaan tercatat"
         />
         <SummaryCard
           label="Belum Dikerjakan"
           value={summary.notStarted}
-          icon="clock"
-          tone="warning"
-          hint="Menunggu untuk dijadwalkan"
+          hint="Menunggu dijadwalkan"
         />
         <SummaryCard
           label="Sedang Dikerjakan"
           value={summary.inProgress}
-          icon="film"
-          tone="info"
-          hint="Sedang dalam proses produksi"
+          hint="Sedang dalam proses"
         />
         <SummaryCard
           label="Sudah Dikerjakan"
           value={summary.completed}
-          icon="check"
-          tone="success"
-          hint="Pekerjaan yang sudah selesai"
+          hint="Pekerjaan selesai"
         />
       </section>
 
@@ -72,10 +65,9 @@ export default async function DashboardPage() {
             action={
               <Link
                 href="/jobs"
-                className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline"
+                className="text-[13px] font-medium text-brand hover:underline"
               >
                 Lihat semua job
-                <Icon name="arrowRight" className="h-3.5 w-3.5" />
               </Link>
             }
           />
@@ -83,16 +75,15 @@ export default async function DashboardPage() {
             <EmptyState
               icon="calendar"
               title="Belum ada jadwal wedding"
-              description="Jadwal wedding akan muncul di sini setelah job dengan kategori Wedding ditambahkan."
+              description="Jadwal wedding akan muncul di sini setelah job kategori Wedding ditambahkan."
             />
           ) : (
             <Table>
               <THead>
                 <TR>
                   <TH>Tanggal</TH>
-                  <TH>Nama Job</TH>
+                  <TH>Job</TH>
                   <TH>Client/Vendor</TH>
-                  <TH>Venue</TH>
                   <TH>Status</TH>
                 </TR>
               </THead>
@@ -103,8 +94,8 @@ export default async function DashboardPage() {
                       <span className="font-medium text-ink">
                         {formatShortDate(item.executionDate)}
                       </span>
-                      <span className="ml-1 text-xs text-ink-muted">
-                        ({formatCountdown(item.executionDate)})
+                      <span className="ml-1.5 text-[12px] text-ink-muted">
+                        {formatCountdown(item.executionDate)}
                       </span>
                     </TD>
                     <TD>
@@ -114,10 +105,11 @@ export default async function DashboardPage() {
                       >
                         {item.jobName}
                       </Link>
-                      <p className="text-xs text-ink-muted">{item.jobNumber}</p>
+                      <p className="mt-0.5 text-[12px] text-ink-muted">
+                        {item.venueName ?? item.jobNumber}
+                      </p>
                     </TD>
                     <TD className="text-ink-soft">{item.counterpartyName}</TD>
-                    <TD className="text-ink-soft">{item.venueName ?? "-"}</TD>
                     <TD>
                       <JobStatusBadge status={item.status} />
                     </TD>
@@ -131,7 +123,7 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader
             title="Incoming Editing"
-            description="Delivery yang belum selesai berdasarkan deadline terdekat."
+            description="Delivery belum selesai berdasarkan deadline terdekat."
           />
           {incomingEditing.length === 0 ? (
             <EmptyState
@@ -144,8 +136,7 @@ export default async function DashboardPage() {
               <THead>
                 <TR>
                   <TH>Deadline</TH>
-                  <TH>Nama Delivery</TH>
-                  <TH>Job</TH>
+                  <TH>Delivery</TH>
                   <TH>Status</TH>
                 </TR>
               </THead>
@@ -156,20 +147,20 @@ export default async function DashboardPage() {
                       <span className="font-medium text-ink">
                         {formatShortDate(item.deadline)}
                       </span>
-                      <span className="ml-1 text-xs text-ink-muted">
-                        ({formatCountdown(item.deadline)})
+                      <span className="ml-1.5 text-[12px] text-ink-muted">
+                        {formatCountdown(item.deadline)}
                       </span>
-                    </TD>
-                    <TD className="font-medium text-ink">
-                      {item.deliveryName}
                     </TD>
                     <TD>
                       <Link
                         href={`/jobs/${item.jobNumber}`}
-                        className="text-ink-soft hover:text-brand hover:underline"
+                        className="font-medium text-ink hover:text-brand hover:underline"
                       >
-                        {item.jobName}
+                        {item.deliveryName}
                       </Link>
+                      <p className="mt-0.5 text-[12px] text-ink-muted">
+                        {item.jobName}
+                      </p>
                     </TD>
                     <TD>
                       <DeliveryStatusBadge status={item.status} />

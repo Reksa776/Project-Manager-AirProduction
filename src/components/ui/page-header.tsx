@@ -11,12 +11,14 @@ export function PageHeader({
 }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
-      <div className="space-y-1">
-        <h1 className="text-xl font-semibold tracking-tight text-ink">
+      <div className="space-y-1.5">
+        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">
           {title}
         </h1>
         {description ? (
-          <p className="max-w-2xl text-sm text-ink-soft">{description}</p>
+          <p className="max-w-2xl text-sm leading-relaxed text-ink-soft">
+            {description}
+          </p>
         ) : null}
       </div>
       {actions ? (

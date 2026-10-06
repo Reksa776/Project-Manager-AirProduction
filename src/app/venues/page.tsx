@@ -22,10 +22,10 @@ export default async function VenuesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Venues"
-        description="Daftar lokasi pelaksanaan pekerjaan yang digunakan pada job dokumentasi."
+        description="Lokasi pelaksanaan pekerjaan dokumentasi yang digunakan pada job."
       />
 
-      <Card>
+      <Card className="overflow-hidden">
         {venues.length === 0 ? (
           <EmptyState
             icon="venues"
@@ -46,9 +46,9 @@ export default async function VenuesPage() {
               {venues.map((venue) => (
                 <TR key={venue.id}>
                   <TD className="font-medium text-ink">{venue.name}</TD>
-                  <TD className="text-ink-soft">{venue.address ?? "-"}</TD>
-                  <TD className="text-ink-soft">{venue.city ?? "-"}</TD>
-                  <TD className="tabular-nums text-ink-soft">
+                  <TD>{venue.address ?? "-"}</TD>
+                  <TD>{venue.city ?? "-"}</TD>
+                  <TD className="tabular-nums">
                     {venue.capacity ? `${venue.capacity} orang` : "-"}
                   </TD>
                 </TR>

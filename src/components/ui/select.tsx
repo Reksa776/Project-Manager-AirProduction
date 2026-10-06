@@ -26,7 +26,7 @@ export function Select({
   return (
     <div className="flex flex-col gap-1.5">
       {label ? (
-        <label htmlFor={selectId} className="text-xs font-medium text-ink-soft">
+        <label htmlFor={selectId} className="text-[13px] font-medium text-ink-soft">
           {label}
         </label>
       ) : null}
@@ -34,8 +34,8 @@ export function Select({
         <select
           id={selectId}
           className={cn(
-            "h-10 w-full appearance-none rounded-lg border border-line-strong bg-white pl-3 pr-9 text-sm text-ink",
-            "focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20",
+            "h-9 w-full appearance-none rounded-lg border border-line bg-panel pl-3 pr-9 text-sm text-ink",
+            "transition-colors focus:border-ink-muted focus:outline-none focus:ring-2 focus:ring-ink/5",
             "disabled:cursor-not-allowed disabled:bg-app",
             className,
           )}

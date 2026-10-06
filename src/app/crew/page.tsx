@@ -26,7 +26,7 @@ export default async function CrewPage() {
         description="Data master crew beserta default payment. Payment aktual untuk suatu job dicatat pada assignment Job-Crew."
       />
 
-      <Card>
+      <Card className="overflow-hidden">
         {crew.length === 0 ? (
           <EmptyState
             icon="crew"
@@ -47,13 +47,11 @@ export default async function CrewPage() {
               {crew.map((member) => (
                 <TR key={member.id}>
                   <TD className="font-medium text-ink">{member.name}</TD>
-                  <TD className="text-ink-soft">{member.role}</TD>
+                  <TD>{member.role}</TD>
                   <TD className="tabular-nums text-ink">
                     {formatCurrency(member.defaultPayment)}
                   </TD>
-                  <TD className="whitespace-nowrap text-ink-soft">
-                    {member.phone ?? "-"}
-                  </TD>
+                  <TD className="whitespace-nowrap">{member.phone ?? "-"}</TD>
                 </TR>
               ))}
             </TBody>

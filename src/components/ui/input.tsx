@@ -24,7 +24,7 @@ export function Input({
       {label ? (
         <label
           htmlFor={inputId}
-          className="text-xs font-medium text-ink-soft"
+          className="text-[13px] font-medium text-ink-soft"
         >
           {label}
         </label>
@@ -38,21 +38,21 @@ export function Input({
         <input
           id={inputId}
           className={cn(
-            "h-10 w-full rounded-lg border border-line-strong bg-white px-3 text-sm text-ink",
+            "h-9 w-full rounded-lg border border-line bg-panel px-3 text-sm text-ink",
             "placeholder:text-ink-muted",
-            "focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20",
+            "transition-colors focus:border-ink-muted focus:outline-none focus:ring-2 focus:ring-ink/5",
             "disabled:cursor-not-allowed disabled:bg-app",
             leading ? "pl-9" : null,
-            error && "border-[#f04438] focus:ring-[#f04438]/20",
+            error && "border-[#d68a80] focus:ring-[#b42318]/10",
             className,
           )}
           {...props}
         />
       </div>
       {error ? (
-        <p className="text-xs text-[#b42318]">{error}</p>
+        <p className="text-[13px] text-[#a1352b]">{error}</p>
       ) : hint ? (
-        <p className="text-xs text-ink-muted">{hint}</p>
+        <p className="text-[13px] text-ink-muted">{hint}</p>
       ) : null}
     </div>
   );

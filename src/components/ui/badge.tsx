@@ -10,13 +10,14 @@ export type BadgeTone =
   | "danger"
   | "brand";
 
+/** Warna semantik yang tetap soft, tanpa saturasi berlebihan. */
 const toneClasses: Record<BadgeTone, string> = {
-  neutral: "bg-[#f2f4f7] text-[#475467] ring-[#e4e7ec]",
-  info: "bg-[#eff8ff] text-[#175cd3] ring-[#d1e9ff]",
-  success: "bg-[#ecfdf3] text-[#027a48] ring-[#d1fadf]",
-  warning: "bg-[#fffaeb] text-[#b54708] ring-[#fedf89]",
-  danger: "bg-[#fef3f2] text-[#b42318] ring-[#fee4e2]",
-  brand: "bg-brand-soft text-[#1d4ed8] ring-[#d1e0fb]",
+  neutral: "bg-[#f5f5f5] text-[#525252] ring-[#ebebeb]",
+  info: "bg-[#f2f6fd] text-[#2f5fe0] ring-[#e2eafb]",
+  success: "bg-[#f1f8f3] text-[#2f6b45] ring-[#e0f0e5]",
+  warning: "bg-[#fdf7ee] text-[#8a5a1e] ring-[#f5e9d5]",
+  danger: "bg-[#fdf3f2] text-[#a1352b] ring-[#f6e0dd]",
+  brand: "bg-brand-soft text-[#2f5fe0] ring-[#e2eafb]",
 };
 
 export function Badge({
@@ -33,13 +34,13 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset",
+        "inline-flex items-center gap-1.5 rounded-md px-2 py-[3px] text-[12px] font-medium leading-none ring-1 ring-inset",
         toneClasses[tone],
         className,
       )}
     >
       {dot ? (
-        <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-60" />
       ) : null}
       {children}
     </span>

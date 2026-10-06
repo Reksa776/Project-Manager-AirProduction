@@ -39,10 +39,10 @@ export default async function FinancePage() {
     <div className="space-y-6">
       <PageHeader
         title="Finance"
-        description="Daftar pembayaran client, pembayaran vendor, dan expense yang tercatat pada job. Phase ini hanya menampilkan data, belum ada kalkulasi."
+        description="Daftar pembayaran client, pembayaran vendor, dan expense yang tercatat pada job."
       />
 
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader
           title="Pembayaran Client"
           description="Termin 1 = DP, Termin 2, dan Termin 3 = Pelunasan."
@@ -68,17 +68,15 @@ export default async function FinancePage() {
             <TBody>
               {clientPayments.map((payment) => (
                 <TR key={payment.id}>
-                  <TD className="whitespace-nowrap font-mono text-xs text-ink-soft">
+                  <TD className="whitespace-nowrap font-mono text-[12px] text-ink-muted">
                     {payment.jobNumber}
                   </TD>
-                  <TD className="text-ink">{payment.clientName}</TD>
-                  <TD className="text-ink-soft">
-                    {CLIENT_PAYMENT_TERM_LABEL[payment.term]}
-                  </TD>
+                  <TD className="font-medium text-ink">{payment.clientName}</TD>
+                  <TD>{CLIENT_PAYMENT_TERM_LABEL[payment.term]}</TD>
                   <TD className="tabular-nums text-ink">
                     {formatCurrency(payment.amount)}
                   </TD>
-                  <TD className="whitespace-nowrap text-ink-soft">
+                  <TD className="whitespace-nowrap">
                     {payment.dueDate ? formatShortDate(payment.dueDate) : "-"}
                   </TD>
                   <TD>
@@ -93,7 +91,7 @@ export default async function FinancePage() {
         )}
       </Card>
 
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader
           title="Pembayaran Vendor"
           description="Pembayaran ke vendor terdiri dari DP dan Pelunasan."
@@ -119,17 +117,15 @@ export default async function FinancePage() {
             <TBody>
               {vendorPayments.map((payment) => (
                 <TR key={payment.id}>
-                  <TD className="whitespace-nowrap font-mono text-xs text-ink-soft">
+                  <TD className="whitespace-nowrap font-mono text-[12px] text-ink-muted">
                     {payment.jobNumber}
                   </TD>
-                  <TD className="text-ink">{payment.vendorName}</TD>
-                  <TD className="text-ink-soft">
-                    {VENDOR_PAYMENT_TYPE_LABEL[payment.type]}
-                  </TD>
+                  <TD className="font-medium text-ink">{payment.vendorName}</TD>
+                  <TD>{VENDOR_PAYMENT_TYPE_LABEL[payment.type]}</TD>
                   <TD className="tabular-nums text-ink">
                     {formatCurrency(payment.amount)}
                   </TD>
-                  <TD className="whitespace-nowrap text-ink-soft">
+                  <TD className="whitespace-nowrap">
                     {payment.dueDate ? formatShortDate(payment.dueDate) : "-"}
                   </TD>
                   <TD>
@@ -144,7 +140,7 @@ export default async function FinancePage() {
         )}
       </Card>
 
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader
           title="Expense"
           description="Pengeluaran operasional yang tercatat pada job."
@@ -169,14 +165,16 @@ export default async function FinancePage() {
             <TBody>
               {expenses.map((expense) => (
                 <TR key={expense.id}>
-                  <TD className="whitespace-nowrap text-ink-soft">
+                  <TD className="whitespace-nowrap">
                     {formatShortDate(expense.date)}
                   </TD>
-                  <TD className="whitespace-nowrap font-mono text-xs text-ink-soft">
+                  <TD className="whitespace-nowrap font-mono text-[12px] text-ink-muted">
                     {expense.jobNumber}
                   </TD>
-                  <TD className="text-ink">{expense.description}</TD>
-                  <TD className="text-ink-soft">{expense.category}</TD>
+                  <TD className="font-medium text-ink">
+                    {expense.description}
+                  </TD>
+                  <TD>{expense.category}</TD>
                   <TD className="tabular-nums text-ink">
                     {formatCurrency(expense.amount)}
                   </TD>

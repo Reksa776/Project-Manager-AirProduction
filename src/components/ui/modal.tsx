@@ -51,7 +51,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#101828]/40 p-4 sm:items-center"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/20 p-4 sm:items-center"
       role="presentation"
       onClick={onClose}
     >
@@ -60,16 +60,18 @@ export function Modal({
         aria-modal="true"
         aria-label={title}
         className={cn(
-          "w-full rounded-xl border border-line bg-panel shadow-xl",
+          "w-full rounded-xl border border-line bg-panel shadow-lg",
           sizeClasses[size],
         )}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
-          <div className="space-y-0.5">
-            <h2 className="text-base font-semibold text-ink">{title}</h2>
+        <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
+          <div className="space-y-1">
+            <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-ink">
+              {title}
+            </h2>
             {description ? (
-              <p className="text-sm text-ink-muted">{description}</p>
+              <p className="text-[13px] text-ink-soft">{description}</p>
             ) : null}
           </div>
           <button
@@ -82,10 +84,10 @@ export function Modal({
           </button>
         </div>
 
-        {children ? <div className="px-5 py-4">{children}</div> : null}
+        {children ? <div className="px-6 py-5">{children}</div> : null}
 
         {footer ? (
-          <div className="flex justify-end gap-2 border-t border-line px-5 py-4">
+          <div className="flex justify-end gap-2 border-t border-line px-6 py-4">
             {footer}
           </div>
         ) : null}

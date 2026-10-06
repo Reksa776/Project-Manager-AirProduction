@@ -13,7 +13,7 @@ export default async function JobsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Jobs"
-        description="Daftar seluruh pekerjaan produksi dan dokumentasi. Gunakan pencarian dan filter status untuk menemukan job tertentu."
+        description="Kelola seluruh pekerjaan produksi dan dokumentasi Air Production."
       />
       <JobsTable jobs={jobs} />
     </div>

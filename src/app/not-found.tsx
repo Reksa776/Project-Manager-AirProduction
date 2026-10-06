@@ -5,11 +5,11 @@ import { Card, EmptyState } from "@/components/ui";
 export default function NotFound() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-ink">
+      <div className="space-y-1.5">
+        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink">
           Halaman tidak ditemukan
         </h1>
-        <p className="mt-1 text-sm text-ink-soft">
+        <p className="text-sm text-ink-soft">
           Alamat yang Anda buka tidak tersedia atau data yang dicari tidak ada.
         </p>
       </div>
@@ -21,7 +21,7 @@ export default function NotFound() {
           action={
             <Link
               href="/dashboard"
-              className="inline-flex h-10 items-center rounded-lg bg-brand px-4 text-sm font-medium text-white transition-colors hover:bg-[#2559d0]"
+              className="inline-flex h-9 items-center rounded-lg bg-ink px-3.5 text-sm font-medium text-white transition-colors hover:bg-[#2e2e2e]"
             >
               Kembali ke Dashboard
             </Link>

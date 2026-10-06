@@ -47,7 +47,7 @@ export function Dropdown({ trigger, items, align = "right" }: DropdownProps) {
         <div
           role="menu"
           className={cn(
-            "absolute z-40 mt-1 min-w-44 overflow-hidden rounded-lg border border-line bg-panel py-1 shadow-lg",
+            "absolute z-40 mt-1 min-w-44 overflow-hidden rounded-lg border border-line bg-panel py-1 shadow-md",
             align === "right" ? "right-0" : "left-0",
           )}
         >
@@ -62,10 +62,10 @@ export function Dropdown({ trigger, items, align = "right" }: DropdownProps) {
                 setOpen(false);
               }}
               className={cn(
-                "block w-full px-3.5 py-2 text-left text-sm transition-colors",
-                "disabled:cursor-not-allowed disabled:opacity-50",
+                "block w-full px-3.5 py-2 text-left text-[13px] transition-colors",
+                "disabled:cursor-not-allowed disabled:opacity-45",
                 item.danger
-                  ? "text-[#b42318] hover:bg-[#fef3f2]"
+                  ? "text-[#a1352b] hover:bg-[#fdf3f2]"
                   : "text-ink-soft hover:bg-app hover:text-ink",
               )}
             >

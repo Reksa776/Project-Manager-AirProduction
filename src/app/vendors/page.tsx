@@ -22,10 +22,10 @@ export default async function VendorsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Vendors"
-        description="Vendor adalah pihak yang memberikan pekerjaan kepada Air Production. Relasi vendor berbeda dengan client."
+        description="Vendor adalah pihak yang memberikan pekerjaan kepada Air Production, terpisah dari relasi client."
       />
 
-      <Card>
+      <Card className="overflow-hidden">
         {vendors.length === 0 ? (
           <EmptyState
             icon="vendors"
@@ -47,13 +47,9 @@ export default async function VendorsPage() {
               {vendors.map((vendor) => (
                 <TR key={vendor.id}>
                   <TD className="font-medium text-ink">{vendor.name}</TD>
-                  <TD className="text-ink-soft">
-                    {vendor.contactPerson ?? "-"}
-                  </TD>
-                  <TD className="whitespace-nowrap text-ink-soft">
-                    {vendor.phone ?? "-"}
-                  </TD>
-                  <TD className="text-ink-soft">{vendor.email ?? "-"}</TD>
+                  <TD>{vendor.contactPerson ?? "-"}</TD>
+                  <TD className="whitespace-nowrap">{vendor.phone ?? "-"}</TD>
+                  <TD>{vendor.email ?? "-"}</TD>
                   <TD className="max-w-xs text-ink-muted">
                     {vendor.notes ?? "-"}
                   </TD>

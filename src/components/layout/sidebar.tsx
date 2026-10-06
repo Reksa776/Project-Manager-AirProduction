@@ -15,56 +15,58 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-full flex-col bg-sidebar text-[#cbd3e1]">
-      <div className="flex h-16 items-center gap-3 border-b border-sidebar-line px-5">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white">
+    <div className="flex h-full flex-col border-r border-line bg-panel">
+      <div className="flex h-14 items-center gap-2.5 px-5">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-[12px] font-semibold text-white">
           AP
         </span>
         <div className="leading-tight">
-          <p className="text-sm font-semibold text-white">Air Production</p>
-          <p className="text-[11px] uppercase tracking-wider text-[#7d8aa0]">
-            Production DB
+          <p className="text-[13px] font-semibold tracking-[-0.01em] text-ink">
+            Air Production
           </p>
+          <p className="text-[11px] text-ink-muted">Production DB</p>
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[#6b7a90]">
+      <nav className="flex-1 overflow-y-auto px-3 pt-4 pb-6">
+        <p className="px-3 pb-2 text-[11px] font-medium text-ink-muted">
           Menu Utama
         </p>
-        {NAV_ITEMS.map((item) => {
-          const active = isActive(pathname, item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onNavigate}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                active
-                  ? "bg-brand text-white"
-                  : "text-[#cbd3e1] hover:bg-sidebar-hover hover:text-white",
-              )}
-            >
-              <Icon
-                name={item.icon}
-                className={cn(
-                  "h-[18px] w-[18px]",
-                  active ? "text-white" : "text-[#8896ab] group-hover:text-white",
-                )}
-              />
-              {item.label}
-            </Link>
-          );
-        })}
+        <ul className="space-y-0.5">
+          {NAV_ITEMS.map((item) => {
+            const active = isActive(pathname, item.href);
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  onClick={onNavigate}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex h-9 items-center gap-3 rounded-lg px-3 text-[13px] transition-colors",
+                    active
+                      ? "bg-[#f5f5f5] font-medium text-ink"
+                      : "text-ink-soft hover:bg-[#fafafa] hover:text-ink",
+                  )}
+                >
+                  <Icon
+                    name={item.icon}
+                    className={cn(
+                      "h-[17px] w-[17px] shrink-0",
+                      active ? "text-ink" : "text-ink-muted",
+                    )}
+                  />
+                  {item.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </nav>
 
-      <div className="border-t border-sidebar-line px-5 py-4">
-        <p className="text-[11px] text-[#6b7a90]">
-          Air Production DB · Prototype
+      <div className="border-t border-line px-5 py-4">
+        <p className="text-[11px] leading-relaxed text-ink-muted">
+          Prototype · data mock
         </p>
-        <p className="text-[11px] text-[#6b7a90]">Data sumber: mock</p>
       </div>
     </div>
   );

@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import {
   Badge,
   DeliveryStatusBadge,
   EmptyState,
-  JobStatusBadge,
   TBody,
   TD,
   TH,
@@ -41,22 +40,60 @@ const paymentTone: Record<PaymentStatus, BadgeTone> = {
   PAID: "success",
 };
 
+function Panel({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={cn(
+        "rounded-xl border border-line bg-panel shadow-sm",
+        className,
+      )}
+    >
+      {children}
+    </section>
+  );
+}
+
+function PanelHeading({
+  title,
+  description,
+}: {
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="space-y-1 px-6 py-5">
+      <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-ink">
+        {title}
+      </h3>
+      {description ? (
+        <p className="text-[13px] text-ink-soft">{description}</p>
+      ) : null}
+    </div>
+  );
+}
+
 export function JobDetailTabs({ detail }: { detail: JobDetail }) {
   const [active, setActive] = useState<TabId>("overview");
-  const { job, counterparty, venue, assignments } = detail;
+  const { job, assignments } = detail;
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap gap-1 border-b border-line">
+    <div className="space-y-6">
+      <div className="flex flex-wrap gap-6 border-b border-line">
         {TABS.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setActive(tab.id)}
             className={cn(
-              "-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
+              "-mb-px border-b-2 pb-3 text-[13px] transition-colors",
               active === tab.id
-                ? "border-brand text-brand"
+                ? "border-ink font-medium text-ink"
                 : "border-transparent text-ink-soft hover:text-ink",
             )}
           >
@@ -66,35 +103,28 @@ export function JobDetailTabs({ detail }: { detail: JobDetail }) {
       </div>
 
       {active === "overview" ? (
-        <dl className="grid grid-cols-1 gap-x-8 gap-y-5 rounded-xl border border-line bg-panel p-5 sm:grid-cols-2 lg:grid-cols-3">
-          <DetailItem label="Nomor Job" value={job.jobNumber} mono />
-          <DetailItem label="Nama Job" value={job.jobName} />
-          <DetailItem label="Kategori" value={JOB_CATEGORY_LABEL[job.category]} />
-          <DetailItem
-            label={counterparty.type === "VENDOR" ? "Vendor" : "Client"}
-            value={counterparty.name}
-          />
-          <DetailItem label="Venue" value={venue?.name ?? "-"} />
-          <DetailItem
-            label="Tanggal Pelaksanaan"
-            value={formatShortDate(job.executionDate)}
-          />
-          <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-              Status
-            </dt>
-            <dd className="mt-1.5">
-              <JobStatusBadge status={job.status} />
-            </dd>
-          </div>
-          <div className="sm:col-span-2 lg:col-span-3">
-            <DetailItem label="Catatan" value={job.notes ?? "-"} />
-          </div>
-        </dl>
+        <Panel>
+          <PanelHeading title="Informasi Job" />
+          <dl className="grid grid-cols-1 gap-x-8 gap-y-6 border-t border-line px-6 py-6 sm:grid-cols-2 lg:grid-cols-4">
+            <DetailItem
+              label="Kategori"
+              value={JOB_CATEGORY_LABEL[job.category]}
+            />
+            <DetailItem label="Nomor Job" value={job.jobNumber} mono />
+            <DetailItem label="Dibuat" value={formatShortDate(job.createdAt)} />
+            <DetailItem
+              label="Diperbarui"
+              value={formatShortDate(job.updatedAt)}
+            />
+            <div className="sm:col-span-2 lg:col-span-4">
+              <DetailItem label="Catatan" value={job.notes ?? "-"} />
+            </div>
+          </dl>
+        </Panel>
       ) : null}
 
       {active === "crew" ? (
-        <section className="overflow-hidden rounded-xl border border-line bg-panel">
+        <Panel className="overflow-hidden">
           {assignments.length === 0 ? (
             <EmptyState
               icon="crew"
@@ -117,13 +147,11 @@ export function JobDetailTabs({ detail }: { detail: JobDetail }) {
                     <TD className="font-medium text-ink">
                       {crew?.name ?? "Crew tidak dikenal"}
                     </TD>
-                    <TD className="text-ink-soft">
-                      {assignment.role}
-                    </TD>
-                    <TD className="text-ink-soft">
+                    <TD>{assignment.role}</TD>
+                    <TD className="tabular-nums">
                       {formatCurrency(crew?.defaultPayment ?? 0)}
                     </TD>
-                    <TD className="font-medium text-ink">
+                    <TD className="tabular-nums font-medium text-ink">
                       {formatCurrency(assignment.actualPayment)}
                     </TD>
                   </TR>
@@ -131,11 +159,11 @@ export function JobDetailTabs({ detail }: { detail: JobDetail }) {
               </TBody>
             </Table>
           )}
-        </section>
+        </Panel>
       ) : null}
 
       {active === "delivery" ? (
-        <section className="overflow-hidden rounded-xl border border-line bg-panel">
+        <Panel className="overflow-hidden">
           {detail.deliveries.length === 0 ? (
             <EmptyState
               icon="film"
@@ -156,10 +184,10 @@ export function JobDetailTabs({ detail }: { detail: JobDetail }) {
                 {detail.deliveries.map((delivery) => (
                   <TR key={delivery.id}>
                     <TD className="font-medium text-ink">{delivery.name}</TD>
-                    <TD className="whitespace-nowrap text-ink-soft">
+                    <TD className="whitespace-nowrap">
                       {formatShortDate(delivery.deadline)}
                     </TD>
-                    <TD className="whitespace-nowrap text-ink-soft">
+                    <TD className="whitespace-nowrap">
                       {delivery.deliveredAt
                         ? formatShortDate(delivery.deliveredAt)
                         : "-"}
@@ -172,22 +200,23 @@ export function JobDetailTabs({ detail }: { detail: JobDetail }) {
               </TBody>
             </Table>
           )}
-        </section>
+        </Panel>
       ) : null}
 
       {active === "cashflow" ? (
-        <div className="space-y-5">
-          <section className="overflow-hidden rounded-xl border border-line bg-panel">
-            <h3 className="border-b border-line px-5 py-3.5 text-sm font-semibold text-ink">
-              Pembayaran Client
-            </h3>
-            {detail.clientPayments.length === 0 ? (
-              <EmptyState
-                icon="finance"
-                title="Belum ada pembayaran client"
-                description="Termin pembayaran dari client akan tercatat di sini."
-              />
-            ) : (
+        <Panel>
+          <PanelHeading
+            title="Pembayaran Client"
+            description="Termin 1 = DP, Termin 2, dan Termin 3 = Pelunasan."
+          />
+          {detail.clientPayments.length === 0 ? (
+            <EmptyState
+              icon="finance"
+              title="Belum ada pembayaran client"
+              description="Termin pembayaran dari client akan tercatat di sini."
+            />
+          ) : (
+            <div className="border-t border-line">
               <Table>
                 <THead>
                   <TR>
@@ -207,10 +236,10 @@ export function JobDetailTabs({ detail }: { detail: JobDetail }) {
                       <TD className="tabular-nums text-ink">
                         {formatCurrency(payment.amount)}
                       </TD>
-                      <TD className="whitespace-nowrap text-ink-soft">
+                      <TD className="whitespace-nowrap">
                         {payment.dueDate ? formatShortDate(payment.dueDate) : "-"}
                       </TD>
-                      <TD className="whitespace-nowrap text-ink-soft">
+                      <TD className="whitespace-nowrap">
                         {payment.paidDate
                           ? formatShortDate(payment.paidDate)
                           : "-"}
@@ -224,13 +253,14 @@ export function JobDetailTabs({ detail }: { detail: JobDetail }) {
                   ))}
                 </TBody>
               </Table>
-            )}
-          </section>
+            </div>
+          )}
 
-          <section className="overflow-hidden rounded-xl border border-line bg-panel">
-            <h3 className="border-b border-line px-5 py-3.5 text-sm font-semibold text-ink">
-              Pembayaran Vendor
-            </h3>
+          <div className="border-t border-line">
+            <PanelHeading
+              title="Pembayaran Vendor"
+              description="Pembayaran ke vendor terdiri dari DP dan Pelunasan."
+            />
             {detail.vendorPayments.length === 0 ? (
               <EmptyState
                 icon="finance"
@@ -238,49 +268,53 @@ export function JobDetailTabs({ detail }: { detail: JobDetail }) {
                 description="DP dan pelunasan ke vendor akan tercatat di sini."
               />
             ) : (
-              <Table>
-                <THead>
-                  <TR>
-                    <TH>Jenis</TH>
-                    <TH>Jumlah</TH>
-                    <TH>Jatuh Tempo</TH>
-                    <TH>Tanggal Bayar</TH>
-                    <TH>Status</TH>
-                  </TR>
-                </THead>
-                <TBody>
-                  {detail.vendorPayments.map((payment) => (
-                    <TR key={payment.id}>
-                      <TD className="font-medium text-ink">
-                        {VENDOR_PAYMENT_TYPE_LABEL[payment.type]}
-                      </TD>
-                      <TD className="tabular-nums text-ink">
-                        {formatCurrency(payment.amount)}
-                      </TD>
-                      <TD className="whitespace-nowrap text-ink-soft">
-                        {payment.dueDate ? formatShortDate(payment.dueDate) : "-"}
-                      </TD>
-                      <TD className="whitespace-nowrap text-ink-soft">
-                        {payment.paidDate
-                          ? formatShortDate(payment.paidDate)
-                          : "-"}
-                      </TD>
-                      <TD>
-                        <Badge tone={paymentTone[payment.status]}>
-                          {PAYMENT_STATUS_LABEL[payment.status]}
-                        </Badge>
-                      </TD>
+              <div className="border-t border-line">
+                <Table>
+                  <THead>
+                    <TR>
+                      <TH>Jenis</TH>
+                      <TH>Jumlah</TH>
+                      <TH>Jatuh Tempo</TH>
+                      <TH>Tanggal Bayar</TH>
+                      <TH>Status</TH>
                     </TR>
-                  ))}
-                </TBody>
-              </Table>
+                  </THead>
+                  <TBody>
+                    {detail.vendorPayments.map((payment) => (
+                      <TR key={payment.id}>
+                        <TD className="font-medium text-ink">
+                          {VENDOR_PAYMENT_TYPE_LABEL[payment.type]}
+                        </TD>
+                        <TD className="tabular-nums text-ink">
+                          {formatCurrency(payment.amount)}
+                        </TD>
+                        <TD className="whitespace-nowrap">
+                          {payment.dueDate
+                            ? formatShortDate(payment.dueDate)
+                            : "-"}
+                        </TD>
+                        <TD className="whitespace-nowrap">
+                          {payment.paidDate
+                            ? formatShortDate(payment.paidDate)
+                            : "-"}
+                        </TD>
+                        <TD>
+                          <Badge tone={paymentTone[payment.status]}>
+                            {PAYMENT_STATUS_LABEL[payment.status]}
+                          </Badge>
+                        </TD>
+                      </TR>
+                    ))}
+                  </TBody>
+                </Table>
+              </div>
             )}
-          </section>
-        </div>
+          </div>
+        </Panel>
       ) : null}
 
       {active === "expense" ? (
-        <section className="overflow-hidden rounded-xl border border-line bg-panel">
+        <Panel className="overflow-hidden">
           {detail.expenses.length === 0 ? (
             <EmptyState
               icon="finance"
@@ -300,13 +334,13 @@ export function JobDetailTabs({ detail }: { detail: JobDetail }) {
               <TBody>
                 {detail.expenses.map((expense) => (
                   <TR key={expense.id}>
-                    <TD className="whitespace-nowrap text-ink-soft">
+                    <TD className="whitespace-nowrap">
                       {formatShortDate(expense.date)}
                     </TD>
                     <TD className="font-medium text-ink">
                       {expense.description}
                     </TD>
-                    <TD className="text-ink-soft">{expense.category}</TD>
+                    <TD>{expense.category}</TD>
                     <TD className="tabular-nums text-ink">
                       {formatCurrency(expense.amount)}
                     </TD>
@@ -315,7 +349,7 @@ export function JobDetailTabs({ detail }: { detail: JobDetail }) {
               </TBody>
             </Table>
           )}
-        </section>
+        </Panel>
       ) : null}
     </div>
   );
@@ -331,13 +365,11 @@ function DetailItem({
   mono?: boolean;
 }) {
   return (
-    <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-        {label}
-      </dt>
+    <div className="space-y-1.5">
+      <dt className="text-[12px] text-ink-muted">{label}</dt>
       <dd
         className={cn(
-          "mt-1.5 text-sm text-ink",
+          "text-sm text-ink",
           mono && "font-mono text-[13px]",
         )}
       >

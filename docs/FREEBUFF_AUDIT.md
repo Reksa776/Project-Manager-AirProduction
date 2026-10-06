@@ -300,3 +300,218 @@ Jika pekerjaan dilanjutkan oleh OpenCode, kondisi terakhir:- Project berada di r
 - Halaman belum diverifikasi secara visual di browser; disarankan menjalankan
   `npm run dev` lalu memeriksa `/dashboard`, `/jobs`, dan `/jobs/JOB-2026-001`
   pada ukuran desktop, tablet, dan mobile.
+
+---
+
+# FREEBUFF AUDIT — PHASE 1.5 (UI VISUAL REFINEMENT)
+
+## 1. Status
+
+**COMPLETED**
+
+Phase ini hanya menyentuh visual/UI. Tidak ada business logic, struktur data,
+repository, service, maupun routing yang diubah.
+
+## 2. Perubahan Visual yang Dilakukan
+
+**Surface dan warna**
+
+- Background aplikasi menjadi `#F7F7F7` (sebelumnya abu kebiruan).
+- Surface/card, sidebar, dan topbar menjadi putih `#FFFFFF`.
+- Sidebar yang sebelumnya gelap (`#101828`) **dihapus total** dan diganti sidebar putih.
+- Teks: primary `#171717`, secondary `#737373`, muted `#A3A3A3`.
+- Border sangat tipis `#E8E8E8` (sebelumnya `#E5E7EB` / `#D1D5DB`).
+- Accent dikurangi menjadi satu: `#2F5FE0`, dipakai hanya untuk link, focus ring,
+  dan badge "brand". Warna lain hanya untuk status semantik (netral, amber halus,
+  hijau halus, merah halus) dan tetap soft.
+- Gradient, glassmorphism, dan warna neon: tidak ada.
+
+**Shadow dan radius**
+
+- Card memakai `shadow-sm` saja; shadow kustom yang lebih pekat dihapus.
+- `shadow-lg` / `shadow-md` hanya pada elemen overlay yang memang butuh elevasi:
+  modal, dropdown menu, dan drawer sidebar mobile.
+- Radius moderat: card `rounded-xl` (12px), kontrol `rounded-lg` (8px).
+  `rounded-full` hanya untuk avatar, titik status, ikon empty state, dan spinner.
+
+**Tipografi dan spacing**
+
+- Page title 24px weight 600; section title 15px weight 600; body 14px;
+  teks sekunder 12-13px. Hanya memakai weight 400/500/600 (weight 700 dihapus).
+- Padding horizontal halaman 24px (`px-6`) di desktop dan 16px (`px-4`) di mobile.
+- Jarak antar section 24-32px (`space-y-6` pada halaman biasa, `space-y-8` pada Dashboard).
+- Padding internal card 20-24px (`px-6 py-5`, `p-6`).
+- Cell tabel `px-6 py-4`, padding vertikal dinaikkan agar baris lebih lega.
+
+**Application Shell**
+
+- Sidebar: putih, `border-r` tipis, tinggi item 36px, ada whitespace pada grup
+  "Menu Utama". Active state berupa background abu sangat muda (`#F5F5F5`) dan
+  teks lebih tegas, tanpa blok warna besar maupun indikator mencolok.
+- Topbar: tinggi 56px (`h-14`), putih, hanya berisi label section kecil dan info
+  admin. Tombol notifikasi dihapus karena tidak memiliki fungsi.
+- Efek `backdrop-blur` pada topbar dihapus.
+
+**Dashboard**
+
+- Summary card disederhanakan: tanpa chip ikon dekoratif, hanya label kecil,
+  angka besar (30px), dan hint 12px, semuanya putih dengan `shadow-sm`.
+- Tabel Incoming Wedding dipangkas menjadi 4 kolom (Tanggal, Job, Client/Vendor,
+  Status); nama venue menjadi baris sekunder di bawah nama job.
+- Tabel Incoming Editing dipangkas menjadi 3 kolom (Deadline, Delivery, Status);
+  nama job menjadi baris sekunder.
+- Catatan keputusan: bagian "Summary Cards" dan "Job Status Summary" pada brief
+  digabung menjadi satu baris 4 card (Total Jobs + 3 status) karena keduanya
+  menampilkan data yang sama. Penggabungan ini untuk mengurangi duplikasi visual
+  (prinsip LESS BUT BETTER). Tidak ada data atau fitur baru.
+
+**Jobs**
+
+- Search dan filter status dibuat compact serta menyatu di dalam satu card dengan
+  tabel, bukan toolbar mengambang yang penuh tombol.
+- Kolom: Job Number (mono, muted), Job Name (venue sebagai baris sekunder),
+  Client/Vendor (keterangan Client/Vendor sebagai baris sekunder), Kategori,
+  Execution Date, Status, Action.
+- Badge "Client/Vendor" berwarna dihapus dan diganti teks sekunder agar tidak
+  menambah warna.
+- Action per baris disederhanakan menjadi satu menu teks "Aksi" tanpa border,
+  bukan deretan ikon.
+
+**Job Detail**
+
+- Hierarki baru: nomor job (mono, muted), nama job (24px), badge status di kanan,
+  lalu satu white card berisi meta penting (Client/Vendor, Execution Date, Location).
+- Tabs tetap underline sederhana, bukan pill besar; active state memakai border
+  dan teks `ink` yang halus.
+- Panel Overview memakai satu card berisi definition list.
+- Panel Cash Flow menggabungkan "Pembayaran Client" dan "Pembayaran Vendor" dalam
+  satu card yang dipisahkan sub-judul dan divider, bukan dua card terpisah.
+
+**Master Data dan Finance**
+
+- Semua halaman memakai pola identik: PageHeader dan deskripsi, lalu Card putih
+  `overflow-hidden`, lalu Table.
+- Tidak ada lagi style khusus per halaman; seluruh tampilan tabel berasal dari
+  shared component.
+
+## 3. Component yang Diubah
+
+- `src/components/ui/button.tsx`
+- `src/components/ui/input.tsx`
+- `src/components/ui/select.tsx`
+- `src/components/ui/card.tsx`
+- `src/components/ui/badge.tsx`
+- `src/components/ui/status-badge.tsx`
+- `src/components/ui/table.tsx`
+- `src/components/ui/modal.tsx`
+- `src/components/ui/dropdown.tsx`
+- `src/components/ui/page-header.tsx`
+- `src/components/ui/empty-state.tsx`
+- `src/components/ui/loading-state.tsx`
+- `src/components/layout/app-shell.tsx`
+- `src/components/layout/sidebar.tsx`
+- `src/components/layout/topbar.tsx`
+- `src/components/dashboard/summary-card.tsx`
+- `src/components/jobs/jobs-table.tsx`
+- `src/components/jobs/job-detail-tabs.tsx`
+- `src/app/globals.css` (design token)
+
+## 4. Halaman yang Diperbaiki
+
+- `/dashboard`
+- `/jobs`
+- `/jobs/[jobNumber]`
+- `/clients`
+- `/vendors`
+- `/crew`
+- `/venues`
+- `/finance`
+- `not-found` (404) dan `loading` state global
+
+Total 29 file diubah. File di `src/services/*`, `src/repositories/*`,
+`src/data/mock/*`, dan `src/lib/types.ts` **tidak diubah sama sekali**
+(diverifikasi dengan `git diff --name-only` yang menghasilkan 0 file).
+
+## 5. Design System yang Digunakan
+
+Token terpusat di `src/app/globals.css` (Tailwind v4 `@theme`):
+
+- Surface: `--color-app: #f7f7f7`, `--color-panel: #ffffff`
+- Border: `--color-line: #e8e8e8`
+- Teks: `--color-ink: #171717`, `--color-ink-soft: #737373`, `--color-ink-muted: #a3a3a3`
+- Accent: `--color-brand: #2f5fe0`, `--color-brand-soft: #eff3fc`
+- Shadow: `shadow-sm` untuk card, `shadow-lg` / `shadow-md` khusus overlay
+- Radius: `rounded-xl` untuk card, `rounded-lg` untuk kontrol
+
+Semua halaman mengonsumsi token ini melalui shared component di
+`src/components/ui/`, sehingga tidak ada style khusus per halaman.
+
+## 6. Validation
+
+- TypeScript: **PASS** — `npx tsc --noEmit` exit code 0.
+- ESLint: **PASS** — `npx eslint .` exit code 0, tanpa warning.
+- Build: **PASS** — `npm run build` (Next.js 16.3.8) exit code 0, 11 route ter-generate.
+
+## 7. Browser Visual Test
+
+**TIDAK DILAKUKAN.** Environment ini tidak memiliki browser automation atau tool
+screenshot, sehingga tidak ada pengecekan visual (desktop/tablet/mobile),
+pengecekan overflow secara visual, maupun pengecekan console error di browser.
+
+Yang benar-benar dilakukan (bukan pengganti visual test):
+
+- Server produksi dijalankan (`PORT=3102 npm start`), lalu setiap route diminta
+  via HTTP: `/dashboard`, `/jobs`, `/jobs/JOB-2026-001`, `/clients`, `/vendors`,
+  `/crew`, `/venues`, `/finance` menghasilkan **200**, dan route tidak dikenal
+  menghasilkan **404**.
+- Log server diperiksa dan tidak menemukan error runtime.
+- Bundle CSS hasil build diperiksa: token baru ter-bundle (`#f7f7f7`, `#171717`,
+  `#2f5fe0`, `#a3a3a3`, `#737373`, `#e8e8e8`), sedangkan warna lama **tidak ada**
+  (`#101828` = 0, `#2f6bed` = 0, `#1d2939` = 0). Ini membuktikan sidebar gelap
+  sudah hilang dari CSS final.
+- HTML hasil render diperiksa: sidebar memakai `bg-panel` (putih) dan class
+  `bg-sidebar` tidak ada lagi; padding halaman `px-4 py-6 sm:px-6 sm:py-8`
+  terpasang; tidak ada `shadow-2xl`, `font-bold`, atau `bg-gradient` pada output.
+- Jumlah ikon pada Dashboard adalah 8 (7 ikon navigasi dan 1 tombol menu),
+  bukan 12, yang berarti chip ikon dekoratif pada summary card sudah hilang.
+
+Kesimpulan: perubahan visual **terverifikasi secara struktural (CSS dan HTML)**,
+tetapi **belum terverifikasi secara visual di mata pengguna**.
+
+## 8. Masalah yang Masih Tersisa
+
+1. Visual test belum dilakukan (lihat bagian 7). Perlu pengecekan manual di
+   browser pada desktop, tablet, dan mobile, terutama overflow tabel pada layar
+   kecil dan proporsi whitespace.
+2. `npm audit` masih melaporkan 5 high severity vulnerability pada rantai
+   dependency dev (`eslint-config-next` → `fast-glob` → `micromatch` → `braces`).
+   Hanya menyentuh tooling dev, bukan runtime. Tidak diperbaiki karena
+   `npm audit fix --force` akan menurunkan `eslint-config-next` ke 14.2.35
+   (breaking change).
+3. Komponen `Modal` dan `Spinner` tersedia di design system tetapi belum dipakai
+   di halaman mana pun karena belum ada CRUD (di luar scope).
+4. Catatan business rule (sesuai aturan "jangan perbaiki di phase ini, catat saja"):
+   aturan "Job wajib memiliki Client ATAU Vendor" masih hanya diimplementasikan
+   sebagai tipe opsional dan fallback tampilan "Tanpa Client/Vendor" pada
+   `resolveCounterparty`. Belum ada validasi runtime. Ini perlu ditangani pada
+   phase integrasi data, bukan pada Phase 1.5.
+
+## 9. Hal yang TIDAK Dilakukan karena Di Luar Scope
+
+- Tidak mengimplementasikan Google Sheets, Google Cloud, atau API client.
+- Tidak menambahkan database, authentication, multi-user, atau role/permission.
+- Tidak menambahkan task management, TODO, timeline/schedule, maupun JobVendor.
+- Tidak menambahkan fitur baru, chart baru, atau kalkulasi finansial.
+- Tidak mengubah status Job, struktur payment, struktur data, routing, atau mock data.
+- Tidak menghapus halaman yang sudah ada.
+- Tidak menambahkan gradient, glassmorphism, neon color, dark sidebar, background
+  gelap, shadow berat, maupun radius ekstrem.
+
+## 10. Rekomendasi Next Step
+
+1. Lakukan verifikasi visual manual di browser (desktop, tablet, mobile) terhadap
+   `/dashboard`, `/jobs`, `/jobs/JOB-2026-001`, serta halaman master dan finance.
+   Perbaiki jika ditemukan overflow atau ketidakseimbangan spacing.
+2. Setelah visual disetujui, lanjut ke Phase 2 read-only Google Sheets: tambahkan
+   implementasi repository baru dan ubah `getRepositories()` tanpa mengubah
+   service maupun UI.

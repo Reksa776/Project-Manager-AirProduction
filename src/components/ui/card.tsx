@@ -6,7 +6,7 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        "rounded-xl border border-line bg-panel shadow-[0_1px_2px_rgba(16,24,40,0.04)]",
+        "rounded-xl border border-line bg-panel shadow-sm",
         className,
       )}
       {...props}
@@ -28,14 +28,16 @@ export function CardHeader({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4",
+        "flex flex-wrap items-start justify-between gap-4 border-b border-line px-6 py-5",
         className,
       )}
     >
-      <div className="space-y-0.5">
-        <h2 className="text-sm font-semibold text-ink">{title}</h2>
+      <div className="space-y-1">
+        <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-ink">
+          {title}
+        </h2>
         {description ? (
-          <p className="text-xs text-ink-muted">{description}</p>
+          <p className="text-[13px] text-ink-soft">{description}</p>
         ) : null}
       </div>
       {action ? <div className="flex items-center gap-2">{action}</div> : null}
@@ -47,7 +49,7 @@ export function CardBody({
   className,
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("px-5 py-4", className)} {...props} />;
+  return <div className={cn("px-6 py-5", className)} {...props} />;
 }
 
 export function CardContent({

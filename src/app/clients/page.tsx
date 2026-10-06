@@ -22,10 +22,10 @@ export default async function ClientsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Clients"
-        description="Data client yang bekerja langsung dengan Air Production. Client dikaitkan ke job sebagai counterparty."
+        description="Client yang bekerja langsung dengan Air Production dan dikaitkan ke job sebagai counterparty."
       />
 
-      <Card>
+      <Card className="overflow-hidden">
         {clients.length === 0 ? (
           <EmptyState
             icon="clients"
@@ -47,13 +47,9 @@ export default async function ClientsPage() {
               {clients.map((client) => (
                 <TR key={client.id}>
                   <TD className="font-medium text-ink">{client.name}</TD>
-                  <TD className="text-ink-soft">
-                    {client.contactPerson ?? "-"}
-                  </TD>
-                  <TD className="whitespace-nowrap text-ink-soft">
-                    {client.phone ?? "-"}
-                  </TD>
-                  <TD className="text-ink-soft">{client.email ?? "-"}</TD>
+                  <TD>{client.contactPerson ?? "-"}</TD>
+                  <TD className="whitespace-nowrap">{client.phone ?? "-"}</TD>
+                  <TD>{client.email ?? "-"}</TD>
                   <TD className="max-w-xs text-ink-muted">
                     {client.notes ?? "-"}
                   </TD>

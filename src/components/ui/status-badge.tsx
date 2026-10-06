@@ -1,10 +1,8 @@
 import { Badge, type BadgeTone } from "@/components/ui/badge";
-import {
-  DELIVERY_STATUS_LABEL,
-  JOB_STATUS_LABEL,
-} from "@/lib/labels";
+import { DELIVERY_STATUS_LABEL, JOB_STATUS_LABEL } from "@/lib/labels";
 import type { DeliveryStatus, JobStatus } from "@/lib/types";
 
+/** Status Job dan Delivery memakai warna semantik yang tetap soft. */
 const jobStatusTone: Record<JobStatus, BadgeTone> = {
   NOT_STARTED: "neutral",
   IN_PROGRESS: "warning",

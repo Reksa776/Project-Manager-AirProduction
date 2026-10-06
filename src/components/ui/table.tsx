@@ -27,7 +27,10 @@ export function THead({
 }: HTMLAttributes<HTMLTableSectionElement>) {
   return (
     <thead
-      className={cn("bg-[#f9fafb] text-left", className)}
+      className={cn(
+        "border-b border-line bg-panel text-left [&>tr:hover]:bg-panel",
+        className,
+      )}
       {...props}
     />
   );
@@ -46,7 +49,7 @@ export function TR({
 }: HTMLAttributes<HTMLTableRowElement>) {
   return (
     <tr
-      className={cn("transition-colors hover:bg-[#fafbfc]", className)}
+      className={cn("bg-panel transition-colors hover:bg-[#fafafa]", className)}
       {...props}
     />
   );
@@ -60,7 +63,7 @@ export function TH({
     <th
       scope="col"
       className={cn(
-        "whitespace-nowrap border-b border-line px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted",
+        "whitespace-nowrap px-6 py-3.5 text-[12px] font-medium tracking-[0.01em] text-ink-muted",
         className,
       )}
       {...props}
@@ -74,7 +77,10 @@ export function TD({
 }: TdHTMLAttributes<HTMLTableCellElement>) {
   return (
     <td
-      className={cn("px-5 py-3.5 align-middle text-sm text-ink", className)}
+      className={cn(
+        "px-6 py-4 align-middle text-sm text-ink-soft",
+        className,
+      )}
       {...props}
     />
   );

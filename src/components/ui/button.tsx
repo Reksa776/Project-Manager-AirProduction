@@ -13,20 +13,20 @@ export type ButtonSize = "sm" | "md";
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "bg-brand text-white hover:bg-[#2559d0] focus-visible:outline-brand disabled:hover:bg-brand",
+    "bg-ink text-white hover:bg-[#2e2e2e] focus-visible:outline-ink disabled:hover:bg-ink",
   secondary:
-    "bg-white text-ink border border-line-strong hover:bg-app focus-visible:outline-brand",
+    "border border-line bg-panel text-ink hover:bg-app focus-visible:outline-ink",
   outline:
-    "bg-transparent text-ink border border-line-strong hover:bg-white focus-visible:outline-brand",
+    "border border-line bg-transparent text-ink hover:bg-panel focus-visible:outline-ink",
   ghost:
-    "bg-transparent text-ink-soft hover:bg-app hover:text-ink focus-visible:outline-brand",
+    "bg-transparent text-ink-soft hover:bg-app hover:text-ink focus-visible:outline-ink",
   danger:
-    "bg-[#dc2626] text-white hover:bg-[#b91c1c] focus-visible:outline-[#dc2626]",
+    "bg-[#b42318] text-white hover:bg-[#972018] focus-visible:outline-[#b42318]",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: "h-8 px-3 text-[13px] gap-1.5",
-  md: "h-10 px-4 text-sm gap-2",
+  sm: "h-8 gap-1.5 px-3 text-[13px]",
+  md: "h-9 gap-2 px-3.5 text-sm",
 };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -45,9 +45,9 @@ export function Button({
     <button
       type={type}
       className={cn(
-        "inline-flex items-center justify-center rounded-lg font-medium transition-colors",
+        "inline-flex items-center justify-center rounded-lg font-medium transition-colors duration-150",
         "focus-visible:outline-2 focus-visible:outline-offset-2",
-        "disabled:cursor-not-allowed disabled:opacity-50",
+        "disabled:cursor-not-allowed disabled:opacity-45",
         variantClasses[variant],
         sizeClasses[size],
         className,
