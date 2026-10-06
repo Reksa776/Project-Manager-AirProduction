@@ -454,35 +454,37 @@ Semua halaman mengonsumsi token ini melalui shared component di
 
 ## 7. Browser Visual Test
 
-**TIDAK DILAKUKAN.** Environment ini tidak memiliki browser automation atau tool
-screenshot, sehingga tidak ada pengecekan visual (desktop/tablet/mobile),
-pengecekan overflow secara visual, maupun pengecekan console error di browser.
+Pengecekan browser **DILAKUKAN** dengan Chrome headless (`--headless=new`) yang
+dikendalikan melalui Chrome DevTools Protocol memakai skrip Node sementara.
+Skrip ini tidak menambah dependency ke project (memakai WebSocket bawaan Node 22)
+dan sudah dihapus setelah dipakai sehingga tidak ikut masuk repository.
 
-Yang benar-benar dilakukan (bukan pengganti visual test):
+Cakupan: 8 route (`/dashboard`, `/jobs`, `/jobs/JOB-2026-001`, `/clients`,
+`/vendors`, `/crew`, `/venues`, `/finance`) x 3 viewport (mobile 375px,
+tablet 768px, desktop 1440px) = **24 kombinasi**.
 
-- Server produksi dijalankan (`PORT=3102 npm start`), lalu setiap route diminta
-  via HTTP: `/dashboard`, `/jobs`, `/jobs/JOB-2026-001`, `/clients`, `/vendors`,
-  `/crew`, `/venues`, `/finance` menghasilkan **200**, dan route tidak dikenal
-  menghasilkan **404**.
-- Log server diperiksa dan tidak menemukan error runtime.
-- Bundle CSS hasil build diperiksa: token baru ter-bundle (`#f7f7f7`, `#171717`,
-  `#2f5fe0`, `#a3a3a3`, `#737373`, `#e8e8e8`), sedangkan warna lama **tidak ada**
-  (`#101828` = 0, `#2f6bed` = 0, `#1d2939` = 0). Ini membuktikan sidebar gelap
-  sudah hilang dari CSS final.
-- HTML hasil render diperiksa: sidebar memakai `bg-panel` (putih) dan class
-  `bg-sidebar` tidak ada lagi; padding halaman `px-4 py-6 sm:px-6 sm:py-8`
-  terpasang; tidak ada `shadow-2xl`, `font-bold`, atau `bg-gradient` pada output.
-- Jumlah ikon pada Dashboard adalah 8 (7 ikon navigasi dan 1 tombol menu),
-  bukan 12, yang berarti chip ikon dekoratif pada summary card sudah hilang.
+Hasil pada seluruh 24 kombinasi:
 
-Kesimpulan: perubahan visual **terverifikasi secara struktural (CSS dan HTML)**,
-tetapi **belum terverifikasi secara visual di mata pengguna**.
+- **Horizontal overflow: 0.** `document.documentElement.scrollWidth` tidak
+  pernah melebihi `window.innerWidth` (selisih negatif hanya lebar scrollbar).
+- **Console error: 0 dan exception: 0.** Tidak ada error JavaScript di browser.
+- Warna terhitung (computed style) sesuai token: `body` = `rgb(247, 247, 247)`
+  (#F7F7F7), sidebar = `rgb(255, 255, 255)` (putih, sidebar gelap benar-benar
+  hilang), topbar = `rgb(255, 255, 255)`.
+- Active state navigasi terbukti berbeda dan halus: item aktif
+  `rgb(23, 23, 23)` (#171717) sedangkan item tidak aktif `rgb(115, 115, 115)`
+  (#737373).
+
+Yang **belum** dilakukan: penilaian visual subjektif oleh mata manusia
+(estetika, keseimbangan whitespace, proporsi tipografi, review screenshot).
+Pengecekan di atas bersifat terukur (layout, overflow, warna, error console)
+dan **bukan** pengganti review desain.
 
 ## 8. Masalah yang Masih Tersisa
 
-1. Visual test belum dilakukan (lihat bagian 7). Perlu pengecekan manual di
-   browser pada desktop, tablet, dan mobile, terutama overflow tabel pada layar
-   kecil dan proporsi whitespace.
+1. Penilaian visual subjektif (estetika dan proporsi whitespace) belum dilakukan
+   oleh manusia. Pengecekan browser sudah dijalankan dan tidak menemukan overflow
+   maupun console error (lihat bagian 7), tetapi tidak ada review screenshot.
 2. `npm audit` masih melaporkan 5 high severity vulnerability pada rantai
    dependency dev (`eslint-config-next` → `fast-glob` → `micromatch` → `braces`).
    Hanya menyentuh tooling dev, bukan runtime. Tidak diperbaiki karena
