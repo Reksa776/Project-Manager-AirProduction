@@ -517,3 +517,163 @@ dan **bukan** pengganti review desain.
 2. Setelah visual disetujui, lanjut ke Phase 2 read-only Google Sheets: tambahkan
    implementasi repository baru dan ubah `getRepositories()` tanpa mengubah
    service maupun UI.
+---
+
+# FREEBUFF AUDIT — PHASE 2A (GOOGLE CLOUD + SERVICE ACCOUNT)
+
+## Status
+
+**BLOCKED** untuk bagian provisioning Google Cloud (Step 2–5).
+Bagian environment, security, dan validasi project **COMPLETED**.
+
+Alasan singkat: environment ini tidak memiliki akses terautentikasi ke Google
+Cloud (tidak ada `gcloud` CLI, tidak ada Google Cloud SDK, tidak ada credential
+Google, dan tidak ada sesi browser Google yang bisa dipakai). Pembuatan project,
+enable API, dan pembuatan Service Account hanya bisa dilakukan dari akun Google
+pemilik project. Credential tidak boleh diminta maupun dikirim lewat chat, jadi
+langkah tersebut diserahkan ke pemilik akun dengan panduan di bagian Blocker.
+
+## Google Cloud
+
+- Project Air Production DB: **BELUM DIBUAT** (menunggu akun Google pemilik project).
+- Google Sheets API: **BELUM DI-ENABLE** (bergantung pada project).
+- Service Account `air-production-db`: **BELUM DIBUAT** (bergantung pada project).
+- JSON key Service Account: **BELUM DIBUAT**.
+- Tidak ada credential rahasia yang dituliskan di audit ini.
+
+Fakta environment yang membuat langkah ini tidak bisa dijalankan:
+
+- `gcloud` CLI: tidak terpasang (`command not found`).
+- Google Cloud SDK: tidak ada di `%LOCALAPPDATA%\Google\Cloud SDK`.
+- Environment variable Google (`GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_*`): tidak ada.
+- gravity_index (katalog integrasi) tidak menyediakan entri Google Sheets /
+  Google Cloud Service Account, sehingga setup dilakukan mengikuti prosedur resmi Google.
+
+## Environment
+
+- `.env.local` — **digunakan** (dibuat, berisi 3 variable dengan nilai kosong).
+- `.env.example` — **dibuat** (hanya placeholder dan komentar, tanpa nilai asli).
+- Environment variable yang disiapkan (nama saja, tanpa nilai):
+  - `GOOGLE_SHEETS_ID`
+  - `GOOGLE_SERVICE_ACCOUNT_EMAIL`
+  - `GOOGLE_PRIVATE_KEY`
+
+Tidak ada nilai credential asli pada kedua file. Kedua file belum dibaca oleh
+aplikasi mana pun pada phase ini (tidak ada `process.env` untuk variable tersebut
+di source code).
+
+Perubahan `.gitignore` yang diperlukan: pattern bawaan `.env*` juga mengabaikan
+`.env.example`, sehingga `.env.example` tidak akan pernah bisa di-commit.
+Ditambahkan pengecualian `!.env.example` serta pattern tambahan untuk credential
+Google (`*.json.key`, `service-account*.json`, `google-credentials*.json`).
+
+## Security
+
+- credential tidak di-commit: **BENAR** — `.env.local` terabaikan Git
+  (terverifikasi dengan `git check-ignore` → rule `.gitignore:34:.env*`).
+- `.env.local` protected: **BENAR** — `git status` tidak pernah menampilkan `.env.local`.
+- private key tidak ada di source code: **BENAR** — pencarian
+  `BEGIN PRIVATE KEY` / `private_key` / `client_email` pada seluruh tracked file
+  menghasilkan **0** file.
+- credential JSON tidak masuk Git: **BENAR** — tidak ada file JSON credential
+  yang tracked; `git ls-files` hanya memuat `package.json`, `package-lock.json`,
+  dan `tsconfig.json`.
+- Pemeriksaan riwayat Git (`git log --all -p`) untuk pola credential:
+  **0 kemunculan** `BEGIN PRIVATE KEY` dan **0 kemunculan** `private_key`.
+  Artinya credential **tidak pernah** masuk Git pada commit mana pun.
+- Pemeriksaan working tree (di luar `node_modules`/`.next`): 0 file berisi
+  penanda private key.
+- Isi private key tidak pernah ditampilkan di terminal, audit, README, maupun output.
+
+## Code Changes
+
+Perubahan pada repository:
+
+- `.gitignore` — **diubah** (menambahkan `!.env.example` dan pattern credential Google).
+- `.env.example` — **file baru** (template placeholder, ikut Git).
+- `.env.local` — **file baru** (lokal, TIDAK ikut Git).
+
+Perubahan code aplikasi: **0 file**.
+
+- `src/services/*` — tidak berubah.
+- `src/repositories/*` (termasuk `index.ts` dan `getRepositories()`) — tidak berubah.
+- `src/data/mock/*` — tidak berubah.
+- `src/components/*` — tidak berubah.
+- `src/app/*` — tidak berubah.
+- `src/lib/types.ts` — tidak berubah.
+- `package.json` — tidak berubah; **tidak ada** dependency Google yang ditambahkan.
+
+## Validation
+
+- TypeScript: **PASS** — `npx tsc --noEmit` exit code 0.
+- ESLint: **PASS** — `npx eslint .` exit code 0, tanpa warning.
+- Build: **PASS** — `npm run build` exit code 0, 11 route ter-generate. Keberadaan
+  `.env.local` dengan nilai kosong tidak mengganggu build karena belum dibaca aplikasi.
+- Git security check: **PASS** — lihat bagian Security (0 credential di tracked
+  files, 0 credential di riwayat Git, `.env.local` terabaikan).
+- Mock repository tetap aktif: **BENAR** — `getRepositories()` masih
+  mengembalikan `mockRepositories` dan tidak ada perubahan pada file terkait.
+
+## Yang Belum Dikerjakan
+
+- Spreadsheet "Air Production DB" **belum dibuat** dan **belum distrukturkan**.
+  Sheet `clients`, `vendors`, `venues`, `crew`, `jobs`, `job_crews`, `deliveries`,
+  `client_payments`, `vendor_payments`, `expenses`, `admins` belum ada.
+  Ini dependency untuk **Phase 2B**.
+- Google Sheets client **belum dibuat**.
+- Repository Google Sheets **belum dibuat**.
+- Operasi read **belum dibuat**.
+- Operasi write **belum dibuat**.
+- CRUD **belum dibuat**.
+- `getRepositories()` **belum diganti** (mock tetap menjadi sumber data aktif).
+- UI **belum diubah**.
+- Service **belum diubah**.
+- Business logic dan routing **belum diubah**.
+- Tidak ada API endpoint aplikasi yang dibuat.
+- Tidak ada pemanggilan Google Sheets API dari aplikasi.
+- Deployment/CI setup credential **belum dibuat** (sesuai instruksi).
+
+## Blocker
+
+Blocker tunggal dan faktual: **akses terautentikasi ke Google Cloud tidak tersedia
+di environment ini**, sehingga project, enable Sheets API, Service Account, dan
+JSON key tidak dapat dibuat dari sini. Tidak ada blocker lain (tidak ada isu
+billing atau permission yang bisa dilaporkan karena project belum ada).
+
+Langkah yang harus dijalankan pemilik akun Google (sekitar 5 menit), lalu nilai
+credential diisi sendiri ke `.env.local`:
+
+1. Buka https://console.cloud.google.com/projectcreate dan buat project baru
+   dengan nama **Air Production DB** (Project ID harus unik, mis.
+   `air-production-db` atau `air-production-db-<angka>`).
+2. Pastikan project tersebut aktif, lalu buka
+   https://console.cloud.google.com/apis/library/sheets.googleapis.com dan klik
+   **Enable** untuk **Google Sheets API**. Jangan mengaktifkan API lain.
+3. Buka https://console.cloud.google.com/iam-admin/serviceaccounts dan buat
+   Service Account dengan nama **air-production-db** (mis.
+   `air-production-db@<project-id>.iam.gserviceaccount.com`).
+4. Buka Service Account tersebut → tab **Keys** → **Add key** → **Create new
+   key** → **JSON**. File JSON akan terunduh.
+5. Bagikan spreadsheet nanti ke email Service Account tersebut dengan akses
+   **Editor** (dilakukan pada Phase 2B setelah spreadsheet dibuat).
+6. Isi `.env.local` (jangan pernah menempelkan isinya ke chat):
+   - `GOOGLE_SHEETS_ID` = ID spreadsheet dari URL
+   - `GOOGLE_SERVICE_ACCOUNT_EMAIL` = field `client_email` pada JSON
+   - `GOOGLE_PRIVATE_KEY` = field `private_key` pada JSON (satu baris,
+     dibungkus tanda kutip ganda, `\n` sebagai pemisah baris)
+7. Simpan file JSON key **di luar folder repository** (atau di lokasi yang sudah
+   diabaikan Git). Jangan commit file tersebut.
+
+Alternatif yang lebih aman untuk production (dicatat saja, tidak dikerjakan pada
+phase ini): gunakan **Workload Identity Federation** atau secret manager milik
+platform deployment, sehingga tidak perlu menyimpan JSON key jangka panjang.
+
+## Catatan Kebutuhan Phase Berikutnya
+
+- Phase 2B memerlukan: spreadsheet sudah dibuat + Service Account sudah diberi
+  akses Editor, karena repository read-only akan langsung menembak spreadsheet tersebut.
+- Dependency Google API (mis. `googleapis` atau `google-auth-library`) **belum
+  ditambahkan**. Penambahan dependency baru sebaiknya dilakukan pada Phase 2B
+  saat client benar-benar dibutuhkan, bukan sekarang.
+- Karena `GOOGLE_PRIVATE_KEY` berisi karakter baris baru, pembacaan nilainya nanti
+  perlu mengganti `\n` menjadi baris baru yang sebenarnya sebelum dipakai library auth.
