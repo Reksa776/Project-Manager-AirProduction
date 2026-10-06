@@ -287,10 +287,8 @@ Phase berikutnya (Phase 2) yang seharusnya dikerjakan:
 
 ## Catatan untuk OpenCode
 
-Jika pekerjaan dilanjutkan oleh OpenCode, kondisi terakhir:
-
-- Project berada di root repository dan sudah menggunakan Git (belum ada commit
-  akhir saat audit ini ditulis; baseline akan di-commit setelah audit).
+Jika pekerjaan dilanjutkan oleh OpenCode, kondisi terakhir:- Project berada di root repository dan sudah menggunakan Git. Baseline Phase 0 + Phase 1 sudah di-commit pada commit `283c893` ("Bangun UI foundation Air Production DB (Phase 0 + Phase 1)"); working tree bersih.
+- Commit tersebut belum di-push ke remote (tidak diminta).
 - `npm install` sudah dijalankan; seluruh validasi (typecheck, lint, build) lulus
   pada kondisi ini.
 - Sumber data aktif adalah **mock** di `src/repositories/mock/index.ts`, dipilih
