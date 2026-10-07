@@ -2038,3 +2038,121 @@ Expense.
 - [x] Audit diperbarui; commit dibuat; working tree clean
 
 Status akhir: **PHASE 5 — COMPLETED**.
+
+---
+
+# FREEBUFF AUDIT — PHASE 6 (CREW & DELIVERY UI)
+
+## 1. Status
+
+**COMPLETED**
+
+## 2. File yang Berubah
+
+- `src/app/actions/job-detail-actions.ts` — **baru**: server actions
+  `createJobCrewAction`, `updateJobCrewAction`, `deleteJobCrewAction`,
+  `createDeliveryAction`, `updateDeliveryAction`, `deleteDeliveryAction`.
+  Pola sama dengan Phase 3/4 actions (nilai dari form diparse & enum
+  dicek, service memvalidasi), lalu `revalidatePath` pada job detail,
+  `/jobs`, dan `/dashboard`.
+- `src/components/jobs/job-detail-tabs.tsx` — tab Crew dan tab Delivery
+  kini CRUD: toolbar "Tambah Crew"/"Tambah Delivery", tabel tambahan
+  kolom "Status Pembayaran"/"Payment Aktual" dan "Type/Quantity/Notes",
+  tombol Edit/Hapus per baris, modal add/edit/delete via komponen
+  existing (`Modal`, `Input`, `Select`, `Button`), busy-state anti
+  double-submit. Default payment dari master crew dipakai sebagai
+  nilai awal form tapi bukan menimpa `job_crews.payment`.
+- `src/app/jobs/[jobNumber]/page.tsx` — juga mengambil `crew` master
+  via `getCrew()` untuk opsi form Add Crew.
+
+## 3. Validation
+
+- jobId/crewId terisi & menunjuk record valid (service `createJobCrew`/
+  `updateJobCrew`, `createDelivery`/`updateDelivery`) — PASS
+  via browser script: missing jobId / missing crewId → reject.
+- `paymentStatus` memakai enum existing `UNPAID/PARTIAL/PAID`;
+  `COMPLETED` → reject (service) — PASS.
+- Payment NaN → reject (service + UI action parse number) — PASS.
+- Delivery: `status` pakai enum existing `DeliveryStatus` — nilai invalid
+  ditolak; `name` kosong → reject; `quantity` invalid (mis. negatif/
+  NaN) → reject; `name` kolom `item_name` sheet — PASS.
+- Delivery status TERPISAH dari Job status (tidak menyamakan).
+- Actual payment crew dari `job_crews.payment`, bukan dari `defaultPayment`
+  master (diverifikasi: master 1500000, create 1750000 simpan apa adanya,
+  update 1800000 PARTIAL) — PASS.
+- Duplicate crew assignment: existing service/repository **belum** punya
+  rule (tidak dilarang secara eksplisit). Phase 6 tidak membuat aturan
+  bisnis baru; dicatat sebagai documented limitation — perlu keputusan
+  bisnis jika suatu waktu harus dilarang.
+
+## 4. Data Flow
+
+UI (JobDetailTabs client) → Server Action (`job-detail-actions.ts`) →
+Service (`job-service`) → `getRepositories()` → `googleRepositories` →
+Google Sheets. Tidak ada googleapis/env credential di Client Component.
+
+## 5. Revalidation
+
+Setelah create/update/delete crew & delivery: `revalidatePath` job
+detail + `/jobs` + `/dashboard`, lalu `router.refresh()` di client —
+tidak ada global state manager. Refresh memicu re-render server page.
+
+## 6. Verification
+
+- `npx tsc --noEmit`: PASS (exit 0).
+- `npx eslint .`: PASS (exit 0).
+- `npm run build`: PASS (11 route).
+- Script service-level (phase6-test.mts via alias loader): 16/16
+  assertion PASS — create/update/delete jobCrew & delivery, semua
+  validasi, relasi refit. Cleanup juga PASS (semua row deleted).
+- HTML response `/jobs/TEST-PHASE6-001` berisi tab + Edit Job + tombol
+  Tambah Crew/Delivery di Client Component rendering; JS client
+  (tombol Edit/Hapus/modal) tidak dapat diverifikasi langsung lewat
+  Chrome headless pada environment ini (streaming RSC tetap hampir
+  tidak menyelesaikan pada Chrome headless untuk route ini — limitation
+  lingkungan, sama seperti Phase 5; curl menerima HTML lengkap 200).
+
+## 7. Security
+
+- Tidak ada credential/private key/token di UI maupun pesan error.
+- Error dari Google dibungkus pesan service yang aman.
+
+## 8. Cleanup
+
+- TEST PHASE6 client/crew/job/job_crew/delivery dihapus seluruhnya;
+  worksheet `job_crews`, `deliveries`, `jobs` kembali header-only.
+- Data manual user tidak disentuh.
+
+## 9. Known Limitations
+
+- Not-found for crew assignment duplicate masih belum diatur (lihat §3).
+- Chrome headless tidak menyelesaikan route dinamis `/jobs/...` pada
+  environment ini; verifikasi interaktif via Chrome tidak dapat
+  dijalankan — verifikasi memakai service-level script + HTML response.
+
+## 10. Keputusan Sengaja Tidak Diubah
+
+- Schema worksheet, header, repository contract, business rules, Dashboard,
+  master Crew page, Phase 4 Job list, dan Phase 5 Overview — tidak diubah.
+- Tidak ada Timeline/Schedule/Task/TODO/JobVendor, tidak ada payroll,
+  attendance, scheduling, upload, storage, atau notification.
+
+## 11. Definition of Done Phase 6
+
+- [x] Crew tab CRUD (add/edit/delete) & Delivery tab CRUD
+- [x] Actual payment menggunakan `job_crews.payment`; defaultPayment
+      tidak menimpa actual payment
+- [x] Payment status & delivery status memakai enum existing terpisah
+- [x] Relasi jobId/crewId tervalidasi di service
+- [x] Quantity/itemName/enum/NaN/negative tervalidasi
+- [x] Error aman; Delete confirmation Modal existing; busy-state
+- [x] Revalidation/refresh bekerja
+- [x] UI tidak direct Google API
+- [x] Tidak mengubah schema tanpa alasan
+- [x] Tidak mengerjakan Timeline/Schedule/dst.
+- [x] Responsive (pattern card/overflow-x-auto existing)
+- [x] Test data dibersihkan
+- [x] tsc/eslint/build PASS; service-level verification PASS
+- [x] Audit diperbarui; commit dibuat; working tree clean
+
+Status akhir: **PHASE 6 — COMPLETED**.

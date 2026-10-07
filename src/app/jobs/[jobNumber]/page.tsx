@@ -6,7 +6,7 @@ import { JobDetailTabs } from "@/components/jobs/job-detail-tabs";
 import { EditJobButton } from "@/components/jobs/edit-job-button";
 import { JobStatusBadge } from "@/components/ui";
 import { getJobDetail } from "@/services/job-service";
-import { getClients, getVendors, getVenues } from "@/services/master-service";
+import { getClients, getCrew, getVendors, getVenues } from "@/services/master-service";
 import { JOB_CATEGORY_LABEL, JOB_STATUS_LABEL } from "@/lib/labels";
 import { formatShortDate } from "@/lib/utils";
 
@@ -32,10 +32,11 @@ export default async function JobDetailPage({
   }
 
   const { job, counterparty, venue } = detail;
-  const [clients, vendors, venues] = await Promise.all([
+  const [clients, vendors, venues, crew] = await Promise.all([
     getClients(),
     getVendors(),
     getVenues(),
+    getCrew(),
   ]);
 
   return (
@@ -83,7 +84,7 @@ export default async function JobDetailPage({
         <MetaItem label="Status" value={JOB_STATUS_LABEL[job.status]} />
       </dl>
 
-      <JobDetailTabs detail={detail} />
+      <JobDetailTabs detail={detail} crew={crew} />
     </div>
   );
 }
