@@ -32,9 +32,12 @@ export interface JobListItem {
   jobName: string;
   category: JobCategory;
   counterparty: Counterparty;
+  venueId?: string;
   venueName?: string;
   executionDate: string;
   status: JobStatus;
+  location?: string;
+  notes?: string;
 }
 
 export interface JobCrewAssignment {

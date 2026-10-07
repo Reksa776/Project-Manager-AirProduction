@@ -50,9 +50,12 @@ export async function getJobListItems(): Promise<JobListItem[]> {
       jobName: job.jobName,
       category: job.category,
       counterparty: resolveCounterparty(job, clientMap, vendorMap),
+      venueId: job.venueId,
       venueName: job.venueId ? venueMap.get(job.venueId)?.name : undefined,
       executionDate: job.executionDate,
       status: job.status,
+      location: job.location,
+      notes: job.notes,
     }))
     .sort((a, b) => b.jobNumber.localeCompare(a.jobNumber));
 }

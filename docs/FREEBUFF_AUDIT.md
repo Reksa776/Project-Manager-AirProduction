@@ -1805,3 +1805,117 @@ Runtime route check (headless Chrome, 4 viewport route
 - [x] Audit diperbarui; git commit dibuat; working tree clean
 
 Status akhir: **PHASE 3 — COMPLETED**.
+
+---
+
+# FREEBUFF AUDIT — PHASE 4 (JOB MANAGEMENT UI)
+
+## 1. Status
+
+**COMPLETED**
+
+## 2. File yang Berubah
+
+- `src/app/actions/job-actions.ts` — **baru**: server actions
+  `createJobAction`, `updateJobAction`, `deleteJobAction`. Enum dikunci
+  runtime (`JOB_CATEGORY`/`JOB_STATUS`/jenis hanya dari type existing),
+  counterpartyXOR dibentuk dari `counterpartyType`, lalu service memvalidasi
+  penuh business rule. `revalidatePath("/jobs")` + `revalidatePath("/dashboard")`
+  setelah mutasi; error diteruskan sebagai pesan aman.
+- `src/components/jobs/jobs-table.tsx` — diperluas: toolbar konsisten
+  Phase 3 (search + filter status + counter + tombol "Tambah Job"),
+  Action dropdown kini: Lihat Detail / Edit / Hapus. Modal Add/Edit Job
+  (field sesuai domain: jobNumber, jobName, category, status, jenis
+  counterparty + pilihan client/vendor saling eksklusif, venue opsional,
+  executionDate, location, notes), Modal konfirmasi delete, busy-state
+  anti double-submit, wrap tabel `overflow-x-auto`. Search (jobNumber,
+  jobName, counterparty) & filter status yang sudah ada dipertahankan.
+  Detail tetap `Link` ke `/jobs/[jobNumber]` (tanpa perubahan halaman
+  Detail — Phase 5).
+- `src/app/jobs/page.tsx` — memuat juga `clients`/`vendors`/`venues` via
+  service untuk kebutuhan form; menyuplai aksi job ke JobsTable.
+- `src/services/types.ts` — `JobListItem` ditambah `venueId`, `location`,
+  `notes` (dibutuhkan prefill form edit). `src/services/job-service.ts` —
+  `getJobListItems` mengisi field baru.
+
+## 3. Data Flow
+
+UI (`app/jobs` + `JobsTable`) → Server Action (`app/actions/job-actions.ts`)
+→ `job-service` (createJob/updateJob/deleteJob + validasi) →
+`getRepositories()` → `googleRepositories` → Google Sheets. Tidak ada
+googleapis import maupun pembacaan env credential di Client Component.
+
+## 4. Business Validation (tervalidasi di browser)
+
+- create dengan client saja → PASS (baris muncul di sheet & tabel).
+- create tanpa counterparty → REJECT dengan pesan "job wajib memiliki
+  clientId ATAU vendorId (tidak keduanya, tidak kosong).".
+- create dengan client + vendor → dicegah oleh UI (satu select
+  counterparty); service tetap menolak jika dipaksa.
+- create duplicate `job_number` → REJECT "sudah dipakai job lain".
+- edit: nama job diperbarui dan `updatedAt` berubah, `createdAt`
+  dipertahankan — terlihat langsung di baris sheet.
+- delete: modal konfirmasi → baris terhapus dari tabel (empty state
+  kembali) dan dari sheet `jobs`.
+- Update/delete ID non-existent dan missing relation sudah teruji pada
+  Phase 2G (service error eksplisit).
+
+## 5. Browser Verification
+
+- Halaman `/jobs` load: 200; data dari Google Sheets tampil; kolom
+  mengikuti domain (tanpa ID internal); `scrollWidth` tidak melebihi
+  viewport.
+- Search & filter status bekerja (toolbar existing dipertahankan).
+- Add/Edit/Delete diverifikasi di browser headless (CDP); pesan error
+  service muncul di dalam modal.
+- Console error: **0** pada pengujian route /jobs.
+- Detail navigation: route `/jobs/[jobNumber]` tetap ada; perubahan besar
+  Detail dijadwalkan Phase 5.
+
+## 6. Cleanup Test Data
+
+- Semua TEST-PHASE4 (2 seed client/vendor + 1 job) dihapus; worksheet
+  `jobs` kembali header-only; `clients`/`vendors` hanya menyisakan data
+  manual user (1 baris `TEST UI Client Updated / desa pangkalan` dari
+  pengujian Phase 3 — dikelola user sendiri).
+- Tidak ada selain data user yang tersisa pada worksheet apapun.
+
+## 7. Hasil tsc / eslint / build
+
+- `npx tsc --noEmit`: **PASS** (exit 0).
+- `npx eslint .`: **PASS** (exit 0).
+- `npm run build`: **PASS** (exit 0, 11 route).
+
+## 8. Known Limitations
+
+- Route master/list tetap static-prerender pada production build;
+  setiap mutasi selalu mengubah ini melalui `revalidatePath`, jadi UI
+  tetap fresh. Data yang diubah langsung di spreadsheet baru terlihat
+  setelah rebuild/revalidate.
+- Job Detail UI belum diubah (Phase 5); navigasi saja.
+
+## 9. Keputusan Sengaja Tidak Diubah
+
+- Schema worksheet, business rules, repository contract, design system,
+  Dashboard logic (Incoming Wedding/Editing), dan Phase 3 master UI —
+  tidak diubah.
+- Tidak ada timeline/schedule/task/JobVendor/filter kompleks.
+
+## 10. Definition of Done Phase 4
+
+- [x] /jobs usable; list dari Google Sheets tampil
+- [x] Search & status filter bekerja
+- [x] Add/Edit/Delete bekerja; delete via Modal
+- [x] Client/Vendor XOR dijaga (UI single-select + service+repository
+      validate)
+- [x] Duplicate jobNumber ditolak
+- [x] Status hanya enum existing
+- [x] Service tetap business layer; tidak direct Google API di UI
+- [x] Loading/empty/error state aman; busy-state anti double submit
+- [x] Tidak ada horizontal page overflow
+- [x] Schema & business rules tidak berubah
+- [x] Test data dibersihkan
+- [x] tsc/eslint/build PASS; browser verification PASS
+- [x] Audit diperbarui; commit dibuat; working tree clean
+
+Status akhir: **PHASE 4 — COMPLETED**.
