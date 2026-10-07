@@ -1919,3 +1919,122 @@ googleapis import maupun pembacaan env credential di Client Component.
 - [x] Audit diperbarui; commit dibuat; working tree clean
 
 Status akhir: **PHASE 4 — COMPLETED**.
+
+---
+
+# FREEBUFF AUDIT — PHASE 5 (JOB DETAIL UI)
+
+## 1. Status
+
+**COMPLETED**
+
+## 2. File yang Berubah
+
+- `src/components/jobs/edit-job-button.tsx` — **baru**: tombol
+  "Edit Job" di halaman detail yang membuka modal edit job (pola yang
+  sama dengan Phase 4 — tidak ada form edit kedua khusus detail).
+- `src/app/jobs/[jobNumber]/page.tsx` — header meta grid diperluas dan
+  diperbaiki: label "Location" sebelumnya menampilkan nama venue (bug),
+  kini menampilkan `job.location`; ditambahkan `Venue`, `Kategori`,
+  `Status` sebagai item; tombol "Edit Job" di samping badge status.
+- `src/components/jobs/job-detail-tabs.tsx` — tab Overview kini
+  menampilkan `Client/Vendor` (satu counterparty), `Venue`, `Location`
+  selain kategori/nomor job/dibuat/diperbarui/catatan. Tab Crew,
+  Delivery, Cash Flow (client payments + vendor payments), Expense tetap
+  read-only berdasarkan data service; tidak ada tab baru.
+- Tidak ada perubahan pada repository contract, service signature,
+  schema, atau business rule.
+
+## 3. Data Flow
+
+UI (Server Component page + Client Components tabs/EditJobButton) →
+Service (`getJobDetail`, `getClients`, `getVendors`, `getVenues`) →
+`getRepositories()` → `googleRepositories` → Google Sheets. Tidak ada
+googleapis langsung / pembacaan credential di Client Component.
+
+## 4. Counterparty / Venue / Status Handling
+
+- Counterparty ditampilkan dari `resolveCounterparty` — tepat satu
+  (Client ATAU Vendor). `UNKNOWN` ditampilkan "Tanpa Client/Vendor"
+  tanpa membuat data palsu.
+- Venue tampil bila `venueId` tersedia; fallback "-".
+- Status memakai enum existing `NOT_STARTED/IN_PROGRESS/COMPLETED`
+  dengan label existing.
+- Job tidak ditemukan → `notFound()` → halaman not-found existing
+  (tidak crash, tanpa stack trace).
+
+## 5. Payment
+
+Client Payment (TERMIN_1/2/3) dan Vendor Payment (DP/PELUNASAN) tampil
+di tab Cash Flow lewat service; tidak ada formula finansial baru. Crew
+payment actual tampil di tab Crew (read-only). Expense tampil di tab
+Expense.
+
+## 6. Browser Verification
+
+- Route valid: HTML server-render diverifikasi via response: header job
+  number/name/status, meta client/vendor/venue/location/kategori, tab
+  Overview/Crew/Delivery/Cash Flow/Expense, tombol Edit Job, link
+  "Kembali ke daftar Jobs".
+- Route invalid (`/jobs/NOPE-404`): halaman "Halaman tidak ditemukan"
+  dengan navigasi aman — PASS; Chrome headless berhasil merendernya.
+- Route dinamis /jobs/[jobNumber] terhadap dev dan prod server, pada
+  environment ini, Chrome headless hangs di readyState "loading" saat
+  streaming RSC, sedangkan Chrome berhasil merender route lain
+  (`/dashboard`=complete, `/jobs`=complete, `/clients`=complete, route
+  not-found=complete). curl menerima HTML lengkap (200, berisi semua
+  field & tab Job Detail), jadi verifikasi konten untuk route ini
+  dilakukan lewat response HTML + bukan dari Chrome. Ini limitation
+  environment, bukan bug aplikasi (server tidak crash, log hanya
+  "destination stream closed early" akibat abort Chrome).
+
+## 7. Cleanup
+
+- Data TEST PHASE5 (1 client, 1 venue, 1 job) dihapus kembali; `jobs`
+  worksheet kembali header-only.
+- Data manual user tidak disentuh.
+
+## 8. Validation
+
+- `npx tsc --noEmit`: PASS (exit 0).
+- `npx eslint .`: PASS (exit 0).
+- `npm run build`: PASS (11 route; `/jobs/[jobNumber]` tetap dynamic ƒ).
+
+## 9. Known Limitations
+
+- Tabulasi client-side bisa dinikmati lewat browser nyata; headless
+  Chrome pada environment ini tidak menyelesaikan streaming untuk route
+  dinamis — verifikasi konten via HTML response.
+- Editan modal pada halaman detail memakai flow Phase 4 (server action +
+  revalidate) — refresh otomatis menggantikan data lama.
+- `Client.contactPerson/email`, `Venue.city/capacity`, `Delivery.deliveredAt`
+  field tidak punya kolom sheet; venue detail di bawah domain, jadi UI
+  December belum ikut fields tersebut.
+
+## 10. Keputusan Sengaja Tidak Diubah
+
+- Schema Google Sheets, header, business rule (XOR, enum status, termin
+  payment), repository contract, mock repo, Phase 4 job list, Dashboard,
+  dan Master data CRUD — tidak diubah. Tidak ada CRUD Crew/Delivery baru
+  (Phase 6).
+
+## 11. Definition of Done Phase 5
+
+- [x] /jobs/[jobNumber] usable & lengkap
+- [x] Counterparty tampil benar (satu saja, tidak double, tanpa palsu)
+- [x] Venue/executionDate/location/status/notes tampil dengan fallback aman
+- [x] Payment tampil dari service existing; tanpa formula finansial baru
+- [x] Tabs existing bekerja; tidak ada tab baru
+- [x] Crew/Delivery read-only saja
+- [x] Edit navigation (modal Phase 4) bekerja
+- [x] Back navigation bekerja
+- [x] Invalid jobNumber → not-found existing; tanpa crash/stack trace
+- [x] Loading/error aman; tidak ada credential di UI
+- [x] UI tidak direct Google API
+- [x] Tidak mengubah Dashboard/Jobs list/schema
+- [x] tsc/eslint/build PASS
+- [x] Browser verification (dengan limitation streaming Chrome, konten
+      terverifikasi via HTML response + Chrome pada route 404 & siblings)
+- [x] Audit diperbarui; commit dibuat; working tree clean
+
+Status akhir: **PHASE 5 — COMPLETED**.

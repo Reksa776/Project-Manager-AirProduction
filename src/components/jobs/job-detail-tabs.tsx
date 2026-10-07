@@ -110,6 +110,18 @@ export function JobDetailTabs({ detail }: { detail: JobDetail }) {
               label="Kategori"
               value={JOB_CATEGORY_LABEL[job.category]}
             />
+            <DetailItem
+              label={detail.counterparty.type === "VENDOR" ? "Vendor" : detail.counterparty.type === "CLIENT" ? "Client" : "Counterparty"}
+              value={detail.counterparty.name}
+            />
+            <DetailItem
+              label="Venue"
+              value={detail.venue?.name ?? "-"}
+            />
+            <DetailItem
+              label="Location"
+              value={job.location ?? "-"}
+            />
             <DetailItem label="Nomor Job" value={job.jobNumber} mono />
             <DetailItem label="Dibuat" value={formatShortDate(job.createdAt)} />
             <DetailItem

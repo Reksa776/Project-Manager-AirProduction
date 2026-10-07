@@ -3,8 +3,11 @@ import { notFound } from "next/navigation";
 
 import { Icon } from "@/components/icons";
 import { JobDetailTabs } from "@/components/jobs/job-detail-tabs";
+import { EditJobButton } from "@/components/jobs/edit-job-button";
 import { JobStatusBadge } from "@/components/ui";
 import { getJobDetail } from "@/services/job-service";
+import { getClients, getVendors, getVenues } from "@/services/master-service";
+import { JOB_CATEGORY_LABEL, JOB_STATUS_LABEL } from "@/lib/labels";
 import { formatShortDate } from "@/lib/utils";
 
 export async function generateMetadata({
@@ -29,6 +32,11 @@ export default async function JobDetailPage({
   }
 
   const { job, counterparty, venue } = detail;
+  const [clients, vendors, venues] = await Promise.all([
+    getClients(),
+    getVendors(),
+    getVenues(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -47,19 +55,32 @@ export default async function JobDetailPage({
             {job.jobName}
           </h1>
         </div>
-        <JobStatusBadge status={job.status} />
+        <div className="flex items-center gap-3">
+          <EditJobButton
+            job={job}
+            counterpartyType={counterparty.type}
+            counterpartyId={counterparty.id}
+            clients={clients}
+            vendors={vendors}
+            venues={venues}
+          />
+          <JobStatusBadge status={job.status} />
+        </div>
       </div>
 
       <dl className="grid grid-cols-1 gap-6 rounded-xl border border-line bg-panel px-6 py-5 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
         <MetaItem
-          label={counterparty.type === "VENDOR" ? "Vendor" : "Client"}
+          label={counterparty.type === "VENDOR" ? "Vendor" : counterparty.type === "CLIENT" ? "Client" : "Counterparty"}
           value={counterparty.name}
         />
         <MetaItem
           label="Execution Date"
           value={formatShortDate(job.executionDate)}
         />
-        <MetaItem label="Location" value={venue?.name ?? "-"} />
+        <MetaItem label="Venue" value={venue?.name ?? "-"} />
+        <MetaItem label="Location" value={job.location ?? "-"} />
+        <MetaItem label="Kategori" value={JOB_CATEGORY_LABEL[job.category]} />
+        <MetaItem label="Status" value={JOB_STATUS_LABEL[job.status]} />
       </dl>
 
       <JobDetailTabs detail={detail} />
