@@ -49,3 +49,17 @@ export const VENDOR_PAYMENT_TYPE_LABEL: Record<VendorPaymentType, string> = {
   DP: "DP",
   PELUNASAN: "Pelunasan",
 };
+
+/**
+ * Kategori expense yang diakui oleh domain/brief. `Expense.category` bertipe
+ * `string` (tidak ada enum domain), sehingga daftar ini menjadi acuan
+ * validasi di UI dan server action agar kategori tetap terbatas pada nilai
+ * yang dikenali (CREW / VENDOR / TRANSPORT / EQUIPMENT / OTHER).
+ */
+export const EXPENSE_CATEGORIES = [
+  "CREW",
+  "VENDOR",
+  "TRANSPORT",
+  "EQUIPMENT",
+  "OTHER",
+] as const;

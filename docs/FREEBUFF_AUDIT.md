@@ -2156,3 +2156,285 @@ tidak ada global state manager. Refresh memicu re-render server page.
 - [x] Audit diperbarui; commit dibuat; working tree clean
 
 Status akhir: **PHASE 6 — COMPLETED**.
+
+---
+
+# FREEBUFF AUDIT — PHASE 7 (FINANCE UI)
+
+## 1. Status
+
+**COMPLETED**
+
+Kondisi awal: pekerjaan sebelumnya (OpenCode) terhenti di tengah jalan karena
+session limit, sehingga Phase 7 **tidak dianggap selesai** saat sesi ini dimulai.
+Audit kondisi repo dilakukan lebih dahulu sebelum coding (lihat bagian 2),
+lalu sisa pekerjaan dilanjutkan dari kondisi aktual — **tidak dari nol**.
+
+## 2. Audit Kondisi Awal (sebelum coding)
+
+- Git: branch `main`, commit terakhir `d5c8f27` "Phase 6: selesaikan Crew &
+  Delivery UI". Belum ada commit Phase 7.
+- Perubahan belum committed: `src/app/finance/page.tsx` (modified),
+  `src/app/actions/finance-actions.ts` (baru),
+  `src/components/finance/finance-crud.tsx` (baru).
+- UI Finance yang sudah ada: halaman `/finance` dengan 3 section
+  (Client Payment, Vendor Payment, Expense) via komponen `FinanceCrud`
+  (search, filter, counter, totals, Modal add/edit/delete, busy-state,
+  empty state) — dipertahankan karena sudah sesuai pola Phase 3-6.
+- Server actions yang sudah ada: 9 action (create/update/delete × 3 entity).
+- Service/repository: `createClientPayment`/`updateClientPayment`/`deleteClientPayment`,
+  `createVendorPayment`/`update`/`delete`, `createExpense`/`update`/`delete`
+  tersedia sejak Phase 2G dengan validasi relasi/enum/amount;
+  `getFinanceOverview()` tersedia di `master-service`.
+- Validation yang sudah ada: term/type/status enum, amount finite (>= 0),
+  jobId wajib ada (service).
+- tsc: PASS. eslint: PASS. Build belum dijalankan ulang di awal sesi.
+- Data TEST-PHASE7 di spreadsheet: **0 baris** (pre-check read-only sebelum
+  test) — pekerjaan sebelumnya tidak meninggalkan data test.
+
+Bug/gap yang ditemukan saat audit dan diperbaiki:
+
+1. Filter status memakai value "Lunas" tetapi label tabel adalah
+   "Sudah Dibayar" (`PAYMENT_STATUS_LABEL.PAID`) → filter tersebut tidak
+   pernah cocok dengan baris mana pun. Diperbaiki: opsi filter dan label form
+   kini dibangun dari `PAYMENT_STATUS_LABEL`/`CLIENT_PAYMENT_TERM_LABEL`/
+   `VENDOR_PAYMENT_TYPE_LABEL` (satu sumber kebenaran di `src/lib/labels.ts`).
+2. Label form tidak konsisten ("Term 1 (DP)" vs label existing
+   "Termin 1 (DP)", "Lunas" vs "Sudah Dibayar"). Diperbaiki → memakai label
+   existing.
+3. Expense category hanya dicek non-empty, tidak dibatasi ke kategori yang
+   dikenali. Diperbaiki → divalidasi terhadap daftar CREW/VENDOR/TRANSPORT/
+   EQUIPMENT/OTHER di server action.
+4. Prefill edit (`paidDate`, `dueDate`, `term`, `type`, `status`, `notes`,
+   `jobId`, `amount`) sudah benar dari awal (diverifikasi, tidak diubah).
+
+## 3. File yang Berubah
+
+- `src/app/finance/page.tsx` — **diubah**: opsi select/filter dibangun dari
+  label existing (memperbaiki bug filter "Lunas"), konstanta
+  `EXPENSE_CATEGORIES` lokal diganti impor bersama dari `lib/labels`, helper
+  `selectOptions<T>` untuk menghasilkan opsi dari record label.
+- `src/lib/labels.ts` — **diubah**: menambah `EXPENSE_CATEGORIES`
+  (`CREW/VENDOR/TRANSPORT/EQUIPMENT/OTHER`) sebagai acuan validasi UI +
+  server action. **Tidak menambah enum domain** — `Expense.category` tetap
+  bertipe `string` sesuai domain yang sudah ada.
+- `src/app/actions/finance-actions.ts` — **baru** (sudah ada parsial dari
+  sesi sebelumnya, dilengkapi): 9 server action untuk finance + validasi
+  runtime enum (term/type/status), amount finite parse, jobId wajib,
+  kategori expense, lalu delegasi ke service; error diteruskan sebagai pesan
+  aman; `revalidatePath("/finance")` + `revalidatePath("/jobs")`.
+- `src/components/finance/finance-crud.tsx` — **baru** (dipertahankan dari
+  sesi sebelumnya): Client Component CRUD generik memakai komponen existing
+  (`Card`, `Table`, `Modal`, `Input`, `Select`, `Button`, `EmptyState`),
+  search + filter + counter + totals, busy-state anti double-submit,
+  delete confirmation via Modal, wrap tabel `overflow-x-auto`.
+
+Tidak berubah: schema Google Sheets, worksheet, repository contract,
+business rule Phase 0-6, Dashboard, Job Detail (tab Cash Flow), master UI,
+mock data, `getRepositories()`.
+
+## 4. Data Flow (arsitektur)
+
+```
+UI (/finance page + FinanceCrud)
+  ↓ Server Action (src/app/actions/finance-actions.ts)
+  ↓ Service (job-service / master-service)
+  ↓ Repository (getRepositories() → googleRepositories)
+  ↓ Google Sheets
+```
+
+Tidak ada import `googleapis`/env credential di Client Component; UI tidak
+memanggil Google API secara langsung.
+
+## 5. Business Validation (tervalidasi)
+
+Client Payment:
+- `term` hanya `TERMIN_1`/`TERMIN_2`/`TERMIN_3` — "1", "2", "3",
+  "TERMIN_4" **ditolak**.
+- `status` hanya `UNPAID`/`PARTIAL`/`PAID` — "COMPLETED", "BROKEN" ditolak.
+- `amount` finite dan >= 0 — `NaN`, string non-numerik, negatif ditolak.
+- `jobId` wajib dan harus menunjuk job valid — jobId kosong/nonexistent ditolak.
+
+Vendor Payment:
+- `type` hanya `DP`/`PELUNASAN` — **`FINAL_PAYMENT` ditolak** (bukan enum
+  domain yang valid), "1" ditolak.
+- status/amount/jobId sama seperti di atas.
+
+Expense:
+- `category` hanya CREW/VENDOR/TRANSPORT/EQUIPMENT/OTHER — kategori lain
+  (mis. "MAKANAN") ditolak di server action.
+- description/date wajib; amount finite >= 0; jobId valid.
+
+Update/delete:
+- ID tidak ada → error eksplisit "tidak ditemukan" (service + action
+  mengembalikan `{ ok: false }`).
+
+Semua validasi ada di dua lapis: server action (parsing/enum sebelum
+service) dan service (relasi + enum + amount) — konsisten dengan pola
+Phase 4/6.
+
+## 6. Financial Semantics / Analisis Double-Counting
+
+Empat sumber nominal yang berbeda dan **saling terpisah**:
+
+| Entity | Field nominal | Makna |
+|---|---|---|
+| ClientPayment | `amount` | Penerimaan dari client per termin |
+| VendorPayment | `amount` | Pembayaran ke vendor per DP/Pelunasan |
+| JobCrew | `job_crews.payment` → `actualPayment` | Pembayaran aktual crew untuk job |
+| Expense | `amount` + `category` | Pengeluaran operasional tercatat |
+
+Temuan dan keputusan:
+
+- `Expense.category` berupa **string bebas** di domain (bukan enum) dan
+  repository melakukan `requiredString` — **tidak ada relasi otomatis**
+  antara Expense dan entity lain.
+- **Tidak ada asumsi** `VendorPayment = Expense kategori VENDOR` dan
+  **tidak ada asumsi** `JobCrew.payment = Expense kategori CREW`. Kategori
+  expense hanya label klasifikasi, bukan foreign key.
+- Halaman `/finance` hanya menampilkan **total terpisah per section**
+  (Total Client Payments, Total Vendor Payments, Total Expense) — tidak
+  menggabungkan angka antar entity dan **tidak menampilkan formula
+  profit/loss apa pun**. Karena itu tidak ada angka agregat ambigu dan
+  tidak ada potensi double-count di UI.
+- Jika user mencatat pengeluaran yang sama dua kali (sebagai VendorPayment
+  sekaligus Expense kategori VENDOR), itu duplikasi **input** yang menjadi
+  keputusan user; domain tidak mendefinisikan hubungan tersebut, sehingga
+  tidak dibuat aturan penggabungan/pencegahan baru. **Didokumentasikan
+  sebagai limitation**, bukan ditebak solusinya.
+- Test membuktikan setiap entity menyimpan nominal sesuai domain tanpa
+  tercampur (lihat bagian 7).
+
+## 7. Hasil Test (prefix `TEST-PHASE7-`)
+
+Test dijalankan memakai module project asli (service + action) melalui
+Node type-stripping + alias loader sementara di luar repository, terhadap
+spreadsheet nyata. Total **60 assertion: 60 PASS, 0 FAIL**.
+
+Service-level (50 PASS):
+- Seed: client, crew, job `TEST-PHASE7-001`.
+- Client Payment: create 1.000.000 → tersimpan & terbaca ulang 1000000;
+  update → 1.100.000 PAID + paidDate + termin berganti — PASS.
+- Vendor Payment: create 500.000 DP → 500000; update → PELUNASAN PAID — PASS.
+- Job Crew: create `actualPayment` 300.000 (bukan defaultPayment 150.000) — PASS.
+- Expense: create 200.000 kategori VENDOR; update kategori → CREW — PASS.
+- Penolakan: term "1"/"TERMIN_4", status "COMPLETED", type
+  "FINAL_PAYMENT"/"1", amount NaN/negatif, jobId nonexistent,
+  description kosong, update/delete ID nonexistent, crewId nonexistent —
+  semua PASS ditolak dengan pesan eksplisit.
+- Double-counting: `getFinanceOverview()` berisi tepat 1 baris per entity
+  dengan amount masing-masing (1.100.000 / 500.000 / 200.000); amount tidak
+  terduplikasi antar entity; total client = jumlah baris client saja;
+  `getJobDetail("TEST-PHASE7-001")` (tab Cash Flow) tetap terbaca 1+1
+  payment + 1 expense — PASS.
+
+Server action-level (10 PASS):
+- kategori expense invalid, term "1", type "FINAL_PAYMENT", amount
+  non-numerik/negatif, jobId kosong, status invalid, description kosong →
+  `{ ok: false }` dengan pesan aman; update/delete ID nonexistent →
+  `{ ok: false }` — PASS.
+- Jalur success action tidak diuji langsung di luar runtime Next (butuh
+  `revalidatePath`); jalur success diuji di level service, dan revalidate
+  pola sama dengan Phase 3/6 yang sudah teruji.
+
+## 8. Hasil Cleanup
+
+- Pre-check: **0 baris TEST-PHASE7** tersisa dari sesi sebelumnya.
+- Selama test, semua data yang dibuat ber-prefix `TEST-PHASE7-` dan
+  dihapus kembali di akhir script (client, crew, job, job_crew,
+  client_payment, vendor_payment, expense).
+- Post-check: 7 worksheet (clients, crew, jobs, job_crews,
+  client_payments, vendor_payments, expenses) **bersih dari TEST-PHASE7**.
+- Tambahan: 3 row `TEST-PHASE7` sementara dibuat lagi untuk verifikasi
+  rendering baris dengan data nyata (bagian 9) lalu dihapus; cleanup
+  akhir kembali mengonfirmasi seluruh worksheet bersih (`CLEANUP_OK`).
+- Data manual user **tidak tersentuh** dan diverifikasi utuh setelah cleanup:
+  client "TEST UI Client Updated" (**tidak dihapus/diubah**), venue
+  "masjid hijau", crew "Basir", job nomor "1" ("rosdiana"), assignment
+  job_crew, delivery "Sneakpeek".
+- Tidak terjadi rate limit selama sesi ini; seluruh operasi API berjalan
+  normal.
+
+## 9. Validation Project
+
+- `npx tsc --noEmit`: **PASS** (exit 0).
+- `npx eslint .`: **PASS** (exit 0, tanpa warning).
+- `npm run build`: **PASS** (exit 0, 11 route; `/finance` static,
+  `/jobs/[jobNumber]` dynamic).
+- Route smoke (server produksi port 3107): `/finance`, `/dashboard`,
+  `/jobs`, `/clients`, `/vendors`, `/crew`, `/venues`, `/jobs/1` →
+  **HTTP 200**; log server tanpa error.
+- HTML `/finance`: 3 section + 3 total + 3 counter ("0 dari 0") + 3 filter
+  + tombol Tambah ×6 + empty state per entity + label terkoreksi
+  ("Sudah Dibayar", "Termin 1 (DP)", "Pelunasan") — PASS.
+- **Rendering baris dengan data asli Google Sheets** (dev server
+  per-request + 3 row `TEST-PHASE7` sementara pada job manual): ketiga
+  section menampilkan baris dari Sheets — Client Payment "Rp 1.000.000"
+  termin "Termin 1 (DP)", Vendor Payment "Rp 500.000" jenis "DP",
+  Expense "Rp 200.000" kategori "VENDOR" — counter "1 dari 1" per
+  section, total per section benar, tanpa error di log dev. Row sementara
+  dihapus segera setelahnya (cleanup OK).
+- HTML `/jobs/1` (data manual): tab Cash Flow ada, job "rosdiana" tampil —
+  PASS (Job Detail tidak rusak).
+- Browser headless Chrome (CDP) pada `/finance`:
+  - **0 console error / 0 page exception**.
+  - **Tidak ada horizontal overflow** pada 375px, 768px, 1440px.
+  - Interaksi: klik "Tambah" → Modal terbuka dengan 7 field, opsi
+    `TERMIN_1` dan `UNPAID` ada, tombol "Batal" menutup Modal — PASS.
+
+## 10. Known Limitations
+
+1. Route `/finance` adalah static (prerender saat build); mutasi dalam
+   aplikasi selalu memicu `revalidatePath` + `router.refresh()` sehingga UI
+   tetap fresh, tetapi perubahan langsung di spreadsheet baru terlihat
+   setelah rebuild/revalidate (pola sama dengan Phase 3/4).
+2. `Expense.category` bertipe `string` di domain (bukan enum TypeScript);
+   pembatasan ke 5 kategori dilakukan di UI (select) + server action.
+   Data lama dengan kategori di luar 5 itu (mis. dari mock "Peralatan")
+   tetap tampil, tetapi **tidak bisa disimpan ulang** lewat form Phase 7
+   sebelum dikembalikan ke salah satu kategori yang sah.
+3. Chrome headless tetap tidak menyelesaikan streaming untuk route
+   dinamis `/jobs/[jobNumber]` (limitation environment yang sama dengan
+   Phase 5/6); verifikasi Cash Flow dilakukan via HTML response + service
+   `getJobDetail`.
+4. Duplikasi input (pengeluaran yang sama dicatat di dua entity) bukan
+   domain rule dan tidak dicegah — lihat bagian 6.
+5. Penilaian visual subjektif oleh mata manusia belum dilakukan (sama
+   seperti phase sebelumnya).
+
+## 11. Keputusan yang Sengaja Tidak Dilakukan
+
+- Tidak mengubah schema Google Sheets / membuat worksheet.
+- Tidak membuat Timeline/Schedule, JobTask/TODO, JobVendor, multi-role auth,
+  payroll, attendance, upload/storage; tidak mengubah Dashboard.
+- Tidak menggunakan `FINAL_PAYMENT`; tidak memperluas enum domain.
+- Tidak membuat formula profit/loss berdasarkan asumsi.
+- Tidak menghapus/mengubah data manual user.
+- Tidak mengulang Phase 0-6.
+
+## 12. Definition of Done Phase 7
+
+- [x] `/finance` usable (server + browser terverifikasi)
+- [x] Client Payment tampil + CRUD (service mendukung; create/update/delete
+      teruji end-to-end ke Sheets)
+- [x] Vendor Payment tampil + CRUD (teruji)
+- [x] Expense tampil + CRUD (teruji)
+- [x] Search/filter bekerja (search all-fields + filter status/kategori;
+      counter "X dari Y")
+- [x] Validation bekerja (60 assertion PASS)
+- [x] Enum benar (TERMIN_1/2/3, DP/PELUNASAN, UNPAID/PARTIAL/PAID,
+      kategori expense; FINAL_PAYMENT ditolak)
+- [x] UI mengikuti pola existing (Modal, busy-state, EmptyState, counter,
+      overflow-x-auto, token Phase 1.5)
+- [x] Arsitektur UI → Server Action → Service → Repository → Sheets
+- [x] Tidak ada direct googleapis dari UI
+- [x] Financial double-counting dianalisis (bagian 6) — tidak ada
+      profit/loss ambigu yang ditampilkan
+- [x] Test selesai (60 PASS / 0 FAIL)
+- [x] TEST-PHASE7 cleanup selesai (pre-check 0, post-check bersih, data
+      manual utuh; tidak ada rate limit)
+- [x] Audit diperbarui
+- [x] Commit Phase 7 dibuat
+- [x] Working tree clean
+
+Status akhir: **PHASE 7 — COMPLETED**.
