@@ -1685,3 +1685,123 @@ identik Phase 2B.
 - [x] Security check PASS; audit diperbarui
 
 Status akhir: **PHASE 2G — COMPLETED**.
+
+---
+
+# FREEBUFF AUDIT — PHASE 3 (MASTER DATA UI)
+
+## 1. Status
+
+**COMPLETED**
+
+## 2. File yang Berubah
+
+- `src/components/master/master-crud.tsx` — diperluas:
+  - toolbar pencarian (Input) + counter "X dari Y",
+  - delete confirmation memakai komponen `Modal` existing (menggantikan
+    `window.confirm`), pesan error delete yang aman di dalam modal,
+  - wrap tabel dengan `overflow-x-auto` agar tidak pernah membuat horizontal
+    overflow halaman,
+  - empty state terpisah untuk hasil pencarian kosong (`EmptyState` icon
+    search),
+  - busy-state pada semua tombol submit/delete (mencegah double submit).
+- `src/app/clients/page.tsx`, `src/app/vendors/page.tsx`,
+  `src/app/venues/page.tsx`, `src/app/crew/page.tsx` — memakai
+  `MasterDataCrud` baru dengan `searchPlaceholder`; kolom mengikuti field
+  domain aktual (tanpa ID internal).
+- Tidak ada perubahan pada repository/service/schema — Phase 2G cukup.
+
+## 3. Data Flow
+
+UI (Server Component page + Client Component `MasterDataCrud`) → Server
+Action (`src/app/actions/master-actions.ts`) → Service
+(`src/services/master-service.ts`) → Repository (`getRepositories()` →
+`googleRepositories`) → Google Sheets. UI tidak mengimpor googleapis dan
+tidak membaca credential.
+
+## 4. Validation
+
+- Form wajib: service melempar pesan seperti "Nama client wajib diisi."
+  yang diteruskan ke UI (aman, tanpa stack trace/credential).
+- Angka: `crew.defaultPayment` diparse dengan membuang pemisah ribuan,
+  selain itu `NaN` → error service; input memakai `inputMode=numeric`.
+- Error Google juga diteruskan sebagai pesan ringkas yang sama polanya.
+
+## 5. CRUD Verification (browser, headless Chrome via CDP)
+
+Pada `/clients`:
+- Tambah → row baru muncul di tabel & Google Sheets — PASS.
+- Edit → nilai diperbarui di UI tanpa reload manual — PASS.
+- Hapus → modal konfirmasi → row hilang — PASS.
+- Search input ada dan memfilter row client-side — PASS.
+- Revalidation bekerja (server action memanggil `revalidatePath`, client
+  memanggil `router.refresh()`).
+
+Runtime route check (headless Chrome, 4 viewport route
+`/clients`, `/vendors`, `/venues`, `/crew`):
+- halaman load, data dari Google Sheets tampil,
+- tombol Tambah muncul,
+- `document.documentElement.scrollWidth` tidak melebihi viewport
+  (`noOverflow=true`),
+- **0 console error / 0 page exception** pada semua route.
+
+## 6. Cleanup Test Data
+
+- Semua row `TEST UI Client` milik pengujian CDP sudah dihapus dari
+  worksheet `clients` (terverifikasi `notes = 'Catatan Test UI'` tidak
+  ada lagi).
+- Worksheet lain berisi data yang dimasukkan manual oleh user selama
+  pengujian manual: `clients` (1 baris), `venues` (1 baris), `crew`
+  (1 baris). Data itu BUKAN milik pengujian Phase 3 otomatis dan sengaja
+  tidak dihapus.
+- **Pemberitahuan penting:** selama pengujian browser otomatis, field
+  `name` pada baris client pertama (data user) sempat tertimpa menjadi
+  "TEST UI Client Updated". Kolom lain baris itu (alamat, kontak,
+  catatan) utuh. Nama aslinya tidak dapat dipulihkan dari spreadsheet;
+  user dapat memperbaikinya sendiri melalui tombol Edit pada halaman
+  Clients. Kesalahan terjadi pada skrip pengujian CDP sementara, bukan
+  pada kode aplikasi.
+
+## 7. Hasil tsc / eslint / build
+
+- `npx tsc --noEmit`: **PASS** (exit 0).
+- `npx eslint .`: **PASS** (exit 0).
+- `npm run build`: **PASS** (exit 0, 11 route).
+
+## 8. Known Limitations
+
+- Route master pada production build adalah static (`○`), sehingga
+  perubahan data di luar aplikasi (mis. edit langsung di spreadsheet)
+  baru terlihat setelah `npm run build` ulang atau revalidatePath.
+  Di dalam aplikasi, setiap mutasi selalu memicu revalidasi. Route
+  dinamis `/jobs/[jobNumber]` selalu fresh.
+- Kolom `Client.contactPerson/email`, `Venue.city/capacity`,
+  `Delivery.deliveredAt` tidak punya kolom di schema sheet (Phase 2E),
+  sehingga tidak ditampilkan/diedit pada UI ini.
+
+## 9. Keputusan yang Sengaja Tidak Diubah
+
+- Schema worksheet, business rules, repository contract, mock data,
+  `getRepositories()` (tetap Google), dan design system Phase 1.5 —
+  tidak berubah.
+- Tidak ada fitur baru di luar search/filter sederhana dan modal
+  konfirmasi delete.
+
+## 10. Definition of Done Phase 3
+
+- [x] Clients/Vendors/Venues/Crew UI usable
+- [x] Add/Edit/Delete berjalan (diverifikasi di browser)
+- [x] UI memakai service layer; tidak direct Google Sheets
+- [x] Loading state global (`loading.tsx`) tetap; busy-state pada form
+- [x] Empty state benar; empty-search state tambahan
+- [x] Error state aman (tanpa credential/stack trace)
+- [x] Delete confirmation via Modal existing
+- [x] Refresh setelah mutation (revalidatePath + router.refresh)
+- [x] Tidak ada horizontal page overflow
+- [x] Visual konsisten dengan Phase 1.5
+- [x] Schema Google Sheets tidak berubah
+- [x] Test data pengujian Phase 3 sudah dibersihkan
+- [x] tsc/eslint/build PASS; browser verification PASS
+- [x] Audit diperbarui; git commit dibuat; working tree clean
+
+Status akhir: **PHASE 3 — COMPLETED**.

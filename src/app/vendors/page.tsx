@@ -31,6 +31,7 @@ export default async function VendorsPage() {
       <MasterDataCrud
         entityLabel="Vendor"
         icon="vendors"
+        searchPlaceholder="Cari nama, kontak, atau catatan..."
         emptyTitle="Belum ada vendor"
         emptyDescription="Data vendor yang tersimpan akan tampil di sini beserta kontak dan catatannya."
         columns={[

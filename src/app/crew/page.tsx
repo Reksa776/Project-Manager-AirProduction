@@ -35,6 +35,7 @@ export default async function CrewPage() {
       <MasterDataCrud
         entityLabel="Crew"
         icon="crew"
+        searchPlaceholder="Cari nama, role, kontak, atau catatan..."
         emptyTitle="Belum ada crew"
         emptyDescription="Data crew yang tersimpan akan tampil di sini beserta role dan default payment-nya."
         columns={[

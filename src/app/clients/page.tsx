@@ -32,6 +32,7 @@ export default async function ClientsPage() {
       <MasterDataCrud
         entityLabel="Client"
         icon="clients"
+        searchPlaceholder="Cari nama, alamat, kontak, atau catatan..."
         emptyTitle="Belum ada client"
         emptyDescription="Data client yang tersimpan akan tampil di sini beserta kontak dan catatannya."
         columns={[

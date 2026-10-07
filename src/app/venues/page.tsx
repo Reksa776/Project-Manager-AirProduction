@@ -32,6 +32,7 @@ export default async function VenuesPage() {
       <MasterDataCrud
         entityLabel="Venue"
         icon="venues"
+        searchPlaceholder="Cari nama, alamat, kontak, atau catatan..."
         emptyTitle="Belum ada venue"
         emptyDescription="Data venue yang tersimpan akan tampil di sini beserta alamat dan kontaknya."
         columns={[

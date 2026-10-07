@@ -35,6 +35,7 @@ export interface MasterCrudProps {
   icon: "clients" | "vendors" | "venues" | "crew" | "inbox";
   emptyTitle: string;
   emptyDescription: string;
+  searchPlaceholder?: string;
   createAction: (values: Record<string, string>) => Promise<MasterActionResult>;
   updateAction: (id: string, values: Record<string, string>) => Promise<MasterActionResult>;
   deleteAction: (id: string) => Promise<MasterActionResult>;
@@ -52,17 +53,29 @@ export function MasterDataCrud({
   icon,
   emptyTitle,
   emptyDescription,
+  searchPlaceholder,
   createAction,
   updateAction,
   deleteAction,
 }: MasterCrudProps) {
   const router = useRouter();
+  const [query, setQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>(() => emptyDraft(fields));
   const [modalError, setModalError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Record<string, string> | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const filteredRows = query.trim()
+    ? rows.filter((row) =>
+        Object.values(row).some((value) =>
+          value.toLowerCase().includes(query.trim().toLowerCase()),
+        ),
+      )
+    : rows;
 
   function openCreate() {
     setEditingId(null);
@@ -93,30 +106,40 @@ export function MasterDataCrud({
     router.refresh();
   }
 
-  async function handleDelete(id: string) {
-    if (!window.confirm(`Hapus ${entityLabel.toLowerCase()} ini? Tindakan tidak dapat dibatalkan.`)) {
-      return;
-    }
+  async function handleConfirmDelete() {
+    if (!deleteTarget) return;
     setBusy(true);
-    setPageError(null);
-    const result = await deleteAction(id);
+    setDeleteError(null);
+    const result = await deleteAction(deleteTarget.id);
     setBusy(false);
     if (!result.ok) {
-      setPageError(result.error);
+      setDeleteError(result.error);
       return;
     }
+    setDeleteTarget(null);
+    setPageError(null);
     router.refresh();
   }
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex items-center justify-between gap-3 border-b border-line px-6 py-4">
-        <p className="text-[13px] text-ink-soft">
-          {rows.length} {entityLabel.toLowerCase()} terdaftar
-        </p>
-        <Button size="sm" variant="primary" onClick={openCreate}>
-          Tambah
-        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-6 py-4">
+        <div className="min-w-52 flex-1 sm:max-w-xs">
+          <Input
+            placeholder={searchPlaceholder ?? `Cari ${entityLabel.toLowerCase()}...`}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            aria-label={`Cari ${entityLabel}`}
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <p className="text-[13px] text-ink-muted">
+            {filteredRows.length} dari {rows.length}
+          </p>
+          <Button size="sm" variant="primary" onClick={openCreate}>
+            Tambah
+          </Button>
+        </div>
       </div>
 
       {pageError ? (
@@ -136,48 +159,62 @@ export function MasterDataCrud({
             </Button>
           }
         />
+      ) : filteredRows.length === 0 ? (
+        <EmptyState
+          icon="search"
+          title="Tidak ditemukan"
+          description={`Tidak ada ${entityLabel.toLowerCase()} yang cocok dengan "${query}".`}
+        />
       ) : (
-        <Table>
-          <THead>
-            <TR>
-              {columns.map((col) => (
-                <TH key={col.key}>{col.label}</TH>
-              ))}
-              <TH>Aksi</TH>
-            </TR>
-          </THead>
-          <TBody>
-            {rows.map((row) => (
-              <TR key={row.id}>
+        <div className="overflow-x-auto">
+          <Table>
+            <THead>
+              <TR>
                 {columns.map((col) => (
-                  <TD key={col.key} className={col.key === columns[0].key ? "font-medium text-ink" : undefined}>
-                    {row[col.key] ?? "-"}
-                  </TD>
+                  <TH key={col.key}>{col.label}</TH>
                 ))}
-                <TD>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      className="text-[13px] text-brand hover:underline"
-                      onClick={() => openEdit(row)}
-                      disabled={busy}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="text-[13px] text-[#a1352b] hover:underline"
-                      onClick={() => handleDelete(row.id)}
-                      disabled={busy}
-                    >
-                      Hapus
-                    </button>
-                  </div>
-                </TD>
+                <TH>Aksi</TH>
               </TR>
-            ))}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {filteredRows.map((row) => (
+                <TR key={row.id}>
+                  {columns.map((col) => (
+                    <TD
+                      key={col.key}
+                      className={col.key === columns[0].key ? "font-medium text-ink" : undefined}
+                    >
+                      {row[col.key] || "-"}
+                    </TD>
+                  ))}
+                  <TD>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="text-[13px] text-brand hover:underline"
+                        onClick={() => openEdit(row)}
+                        disabled={busy}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="text-[13px] text-[#a1352b] hover:underline"
+                        onClick={() => {
+                          setDeleteError(null);
+                          setDeleteTarget(row);
+                        }}
+                        disabled={busy}
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </div>
       )}
 
       <Modal
@@ -208,22 +245,49 @@ export function MasterDataCrud({
                 <textarea
                   className="min-h-20 w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink focus:border-ink-muted focus:outline-none focus:ring-2 focus:ring-ink/5"
                   value={draft[field.key] ?? ""}
-                  onChange={(event) => setDraft((prev) => ({ ...prev, [field.key]: event.target.value }))}
+                  onChange={(event) =>
+                    setDraft((prev) => ({ ...prev, [field.key]: event.target.value }))
+                  }
                 />
               </div>
             ) : (
               <Input
                 key={field.key}
                 label={field.label}
-                type={field.type === "number" ? "text" : "text"}
+                type="text"
                 inputMode={field.type === "number" ? "numeric" : undefined}
                 hint={field.hint}
                 value={draft[field.key] ?? ""}
-                onChange={(event) => setDraft((prev) => ({ ...prev, [field.key]: event.target.value }))}
+                onChange={(event) =>
+                  setDraft((prev) => ({ ...prev, [field.key]: event.target.value }))
+                }
               />
             ),
           )}
         </div>
+      </Modal>
+
+      <Modal
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        title={`Hapus ${entityLabel}`}
+        description={`Yakin ingin menghapus "${deleteTarget?.[columns[0].key] ?? ""}"? Tindakan ini tidak dapat dibatalkan.`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDeleteTarget(null)} disabled={busy}>
+              Batal
+            </Button>
+            <Button variant="danger" onClick={handleConfirmDelete} disabled={busy}>
+              {busy ? "Menghapus..." : "Hapus"}
+            </Button>
+          </>
+        }
+      >
+        {deleteError ? (
+          <p className="rounded-lg border border-[#e8b4ad] bg-[#fdf3f2] px-3 py-2 text-[13px] text-[#a1352b]">
+            {deleteError}
+          </p>
+        ) : null}
       </Modal>
     </Card>
   );
