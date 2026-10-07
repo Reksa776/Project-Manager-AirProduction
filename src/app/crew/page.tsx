@@ -1,16 +1,12 @@
-import {
-  Card,
-  EmptyState,
-  PageHeader,
-  TBody,
-  TD,
-  TH,
-  THead,
-  TR,
-  Table,
-} from "@/components/ui";
+import { PageHeader } from "@/components/ui";
+import { MasterDataCrud } from "@/components/master/master-crud";
 import { getCrew } from "@/services/master-service";
 import { formatCurrency } from "@/lib/utils";
+import {
+  createCrewAction,
+  deleteCrewAction,
+  updateCrewAction,
+} from "@/app/actions/master-actions";
 
 export const metadata = {
   title: "Crew · Air Production DB",
@@ -19,6 +15,16 @@ export const metadata = {
 export default async function CrewPage() {
   const crew = await getCrew();
 
+  const rows = crew.map((member) => ({
+    id: member.id,
+    name: member.name,
+    role: member.role,
+    defaultPayment: String(member.defaultPayment),
+    phone: member.phone ?? "",
+    notes: member.notes ?? "",
+    defaultPaymentLabel: formatCurrency(member.defaultPayment),
+  }));
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -26,38 +32,30 @@ export default async function CrewPage() {
         description="Data master crew beserta default payment. Payment aktual untuk suatu job dicatat pada assignment Job-Crew."
       />
 
-      <Card className="overflow-hidden">
-        {crew.length === 0 ? (
-          <EmptyState
-            icon="crew"
-            title="Belum ada crew"
-            description="Data crew yang tersimpan akan tampil di sini beserta role dan default payment-nya."
-          />
-        ) : (
-          <Table>
-            <THead>
-              <TR>
-                <TH>Nama Crew</TH>
-                <TH>Role</TH>
-                <TH>Default Payment</TH>
-                <TH>Telepon</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {crew.map((member) => (
-                <TR key={member.id}>
-                  <TD className="font-medium text-ink">{member.name}</TD>
-                  <TD>{member.role}</TD>
-                  <TD className="tabular-nums text-ink">
-                    {formatCurrency(member.defaultPayment)}
-                  </TD>
-                  <TD className="whitespace-nowrap">{member.phone ?? "-"}</TD>
-                </TR>
-              ))}
-            </TBody>
-          </Table>
-        )}
-      </Card>
+      <MasterDataCrud
+        entityLabel="Crew"
+        icon="crew"
+        emptyTitle="Belum ada crew"
+        emptyDescription="Data crew yang tersimpan akan tampil di sini beserta role dan default payment-nya."
+        columns={[
+          { key: "name", label: "Nama Crew" },
+          { key: "role", label: "Role" },
+          { key: "defaultPaymentLabel", label: "Default Payment" },
+          { key: "phone", label: "Telepon" },
+          { key: "notes", label: "Catatan" },
+        ]}
+        rows={rows}
+        fields={[
+          { key: "name", label: "Nama Crew", required: true },
+          { key: "role", label: "Role", required: true },
+          { key: "defaultPayment", label: "Default Payment", type: "number", hint: "Contoh: 1500000 atau 1.500.000" },
+          { key: "phone", label: "Telepon" },
+          { key: "notes", label: "Catatan", type: "textarea" },
+        ]}
+        createAction={createCrewAction}
+        updateAction={updateCrewAction}
+        deleteAction={deleteCrewAction}
+      />
     </div>
   );
 }

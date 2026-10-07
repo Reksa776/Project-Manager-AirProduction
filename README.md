@@ -2,9 +2,10 @@
 
 Sistem manajemen operasional internal untuk production/documentation business.
 
-> Status saat ini: **Phase 2E**.
-> Data aktif berasal dari **Google Sheets** (read-only). Mock repository
-> tetap tersedia sebagai fallback/testing di `src/repositories/mock`.
+> Status saat ini: **Phase 2G**.
+> Data aktif berasal dari **Google Sheets** (read + write untuk entity
+> bisnis). Mock repository tetap tersedia sebagai fallback/testing.
+> CRUD UI minimal tersedia pada Clients, Vendors, Venues, dan Crew.
 
 ## Menjalankan Project
 
@@ -63,7 +64,7 @@ Service (services/)
       ↓
 Repository (repositories/)
       ↓
-Google Sheets  ← sumber data aktif (read-only, via googleRepositories)
+Google Sheets  ← sumber data aktif (read + write, via googleRepositories)
 ```
 
 UI hanya bergantung pada Service. Service hanya bergantung pada kontrak

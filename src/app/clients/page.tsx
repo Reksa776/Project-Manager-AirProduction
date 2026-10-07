@@ -1,15 +1,11 @@
-import {
-  Card,
-  EmptyState,
-  PageHeader,
-  TBody,
-  TD,
-  TH,
-  THead,
-  TR,
-  Table,
-} from "@/components/ui";
+import { PageHeader } from "@/components/ui";
+import { MasterDataCrud } from "@/components/master/master-crud";
 import { getClients } from "@/services/master-service";
+import {
+  createClientAction,
+  deleteClientAction,
+  updateClientAction,
+} from "@/app/actions/master-actions";
 
 export const metadata = {
   title: "Clients · Air Production DB",
@@ -18,6 +14,14 @@ export const metadata = {
 export default async function ClientsPage() {
   const clients = await getClients();
 
+  const rows = clients.map((client) => ({
+    id: client.id,
+    name: client.name,
+    address: client.address ?? "",
+    phone: client.phone ?? "",
+    notes: client.notes ?? "",
+  }));
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -25,40 +29,28 @@ export default async function ClientsPage() {
         description="Client yang bekerja langsung dengan Air Production dan dikaitkan ke job sebagai counterparty."
       />
 
-      <Card className="overflow-hidden">
-        {clients.length === 0 ? (
-          <EmptyState
-            icon="clients"
-            title="Belum ada client"
-            description="Data client yang tersimpan akan tampil di sini beserta kontak dan catatannya."
-          />
-        ) : (
-          <Table>
-            <THead>
-              <TR>
-                <TH>Nama Client</TH>
-                <TH>Contact Person</TH>
-                <TH>Telepon</TH>
-                <TH>Email</TH>
-                <TH>Catatan</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {clients.map((client) => (
-                <TR key={client.id}>
-                  <TD className="font-medium text-ink">{client.name}</TD>
-                  <TD>{client.contactPerson ?? "-"}</TD>
-                  <TD className="whitespace-nowrap">{client.phone ?? "-"}</TD>
-                  <TD>{client.email ?? "-"}</TD>
-                  <TD className="max-w-xs text-ink-muted">
-                    {client.notes ?? "-"}
-                  </TD>
-                </TR>
-              ))}
-            </TBody>
-          </Table>
-        )}
-      </Card>
+      <MasterDataCrud
+        entityLabel="Client"
+        icon="clients"
+        emptyTitle="Belum ada client"
+        emptyDescription="Data client yang tersimpan akan tampil di sini beserta kontak dan catatannya."
+        columns={[
+          { key: "name", label: "Nama Client" },
+          { key: "address", label: "Alamat" },
+          { key: "phone", label: "Kontak" },
+          { key: "notes", label: "Catatan" },
+        ]}
+        rows={rows}
+        fields={[
+          { key: "name", label: "Nama Client", required: true },
+          { key: "address", label: "Alamat" },
+          { key: "phone", label: "Kontak" },
+          { key: "notes", label: "Catatan", type: "textarea" },
+        ]}
+        createAction={createClientAction}
+        updateAction={updateClientAction}
+        deleteAction={deleteClientAction}
+      />
     </div>
   );
 }

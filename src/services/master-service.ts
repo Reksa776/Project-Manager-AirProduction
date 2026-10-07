@@ -39,6 +39,145 @@ export async function getCurrentAdmin(): Promise<Admin | null> {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Master CRUD — validasi business di service, persistence di repository.     */
+/* -------------------------------------------------------------------------- */
+
+export interface ClientInput {
+  name: string;
+  address?: string;
+  phone?: string;
+  notes?: string;
+}
+
+export interface VendorInput {
+  name: string;
+  phone?: string;
+  notes?: string;
+}
+
+export interface VenueInput {
+  name: string;
+  address?: string;
+  contact?: string;
+  notes?: string;
+}
+
+export interface CrewInput {
+  name: string;
+  role: string;
+  defaultPayment: number;
+  phone?: string;
+  notes?: string;
+}
+
+function requireNonEmpty(value: string | undefined, label: string): string {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    throw new Error(`${label} wajib diisi.`);
+  }
+  return trimmed;
+}
+
+function normalizeOptional(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+export async function createClient(input: ClientInput): Promise<Client> {
+  return getRepositories().clients.create({
+    name: requireNonEmpty(input.name, "Nama client"),
+    address: normalizeOptional(input.address),
+    phone: normalizeOptional(input.phone),
+    notes: normalizeOptional(input.notes),
+  });
+}
+
+export async function updateClient(id: string, input: ClientInput): Promise<Client> {
+  return getRepositories().clients.update(id, {
+    name: requireNonEmpty(input.name, "Nama client"),
+    address: normalizeOptional(input.address),
+    phone: normalizeOptional(input.phone),
+    notes: normalizeOptional(input.notes),
+  });
+}
+
+export async function deleteClient(id: string): Promise<void> {
+  return getRepositories().clients.delete(id);
+}
+
+export async function createVendor(input: VendorInput): Promise<Vendor> {
+  return getRepositories().vendors.create({
+    name: requireNonEmpty(input.name, "Nama vendor"),
+    phone: normalizeOptional(input.phone),
+    notes: normalizeOptional(input.notes),
+  });
+}
+
+export async function updateVendor(id: string, input: VendorInput): Promise<Vendor> {
+  return getRepositories().vendors.update(id, {
+    name: requireNonEmpty(input.name, "Nama vendor"),
+    phone: normalizeOptional(input.phone),
+    notes: normalizeOptional(input.notes),
+  });
+}
+
+export async function deleteVendor(id: string): Promise<void> {
+  return getRepositories().vendors.delete(id);
+}
+
+export async function createVenue(input: VenueInput): Promise<Venue> {
+  return getRepositories().venues.create({
+    name: requireNonEmpty(input.name, "Nama venue"),
+    address: normalizeOptional(input.address),
+    contact: normalizeOptional(input.contact),
+    notes: normalizeOptional(input.notes),
+  });
+}
+
+export async function updateVenue(id: string, input: VenueInput): Promise<Venue> {
+  return getRepositories().venues.update(id, {
+    name: requireNonEmpty(input.name, "Nama venue"),
+    address: normalizeOptional(input.address),
+    contact: normalizeOptional(input.contact),
+    notes: normalizeOptional(input.notes),
+  });
+}
+
+export async function deleteVenue(id: string): Promise<void> {
+  return getRepositories().venues.delete(id);
+}
+
+export async function createCrew(input: CrewInput): Promise<Crew> {
+  if (!Number.isFinite(input.defaultPayment) || input.defaultPayment < 0) {
+    throw new Error("Default payment crew harus angka valid (>= 0).");
+  }
+  return getRepositories().crew.create({
+    name: requireNonEmpty(input.name, "Nama crew"),
+    role: requireNonEmpty(input.role, "Role crew"),
+    defaultPayment: input.defaultPayment,
+    phone: normalizeOptional(input.phone),
+    notes: normalizeOptional(input.notes),
+  });
+}
+
+export async function updateCrew(id: string, input: CrewInput): Promise<Crew> {
+  if (!Number.isFinite(input.defaultPayment) || input.defaultPayment < 0) {
+    throw new Error("Default payment crew harus angka valid (>= 0).");
+  }
+  return getRepositories().crew.update(id, {
+    name: requireNonEmpty(input.name, "Nama crew"),
+    role: requireNonEmpty(input.role, "Role crew"),
+    defaultPayment: input.defaultPayment,
+    phone: normalizeOptional(input.phone),
+    notes: normalizeOptional(input.notes),
+  });
+}
+
+export async function deleteCrew(id: string): Promise<void> {
+  return getRepositories().crew.delete(id);
+}
+
+/* -------------------------------------------------------------------------- */
 /* Finance                                                                    */
 /* -------------------------------------------------------------------------- */
 

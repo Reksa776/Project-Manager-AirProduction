@@ -1541,3 +1541,147 @@ Melalui module project asli (bukan bypass repository):
 - [x] tsc/eslint/build PASS; audit diperbarui
 
 Status akhir: **PHASE 2F — COMPLETED**.
+
+---
+
+# FREEBUFF AUDIT — PHASE 2G (GOOGLE SHEETS CRUD / WRITE)
+
+## 1. Status
+
+**COMPLETED**
+
+## 2. Repository Contract
+
+`WritableRepository<T>` baru ditambahkan pada `src/repositories/types.ts`:
+`getAll/getById` (existing) + `create(data)`, `update(id, data)`,
+`delete(id)`. `JobRepository` memakai input `Omit<Job, "id" | "createdAt" |
+"updatedAt">` untuk create/update (ID & timestamp dihasilkan repository).
+`AdminRepository` sengaja tetap read-only (authentication belum scope).
+Tidak ada method existing yang dihapus. Kontrak antara mock dan Google
+repository konsisten.
+
+## 3. Google Sheets Write
+
+- Scope client aplikasi diubah minimal menjadi
+  `https://www.googleapis.com/auth/spreadsheets` (satu-satunya perubahan di
+  `client.ts`; tanpa Drive scope).
+- Operasi: `values.append` (create), `values.update` (update row by row
+  number hasil lookup ID), `batchUpdate` + `deleteDimension` (delete row
+  fisik — header index 0 tidak pernah disentuh; `values.clear` TIDAK dipakai
+  untuk delete karena meninggalkan blank row).
+- Lookup `id → row number` selalu dibaca dari data aktual spreadsheet,
+  bukan nomor row yang disimpan.
+
+## 4. Mapping Dua Arah
+
+`mapping.ts` kini punya serializer Domain → Sheet (`clientToRecord`,
+`vendorToRecord`, `venueToRecord`, `crewToRecord`, `jobToRecord`,
+`jobCrewToRecord`, `deliveryToRecord`, `clientPaymentToRecord`,
+`vendorPaymentToRecord`, `expenseToRecord`) + `recordToRow` sesuai urutan
+`SHEET_HEADERS`. Tidak ada mapping kedua yang duplikatif; validasi enum &
+finite number dilakukan saat write (`SheetMappingError`). Optional undefined
+→ cell kosong (bukan `"undefined"`/`"null"`); number → `String(n)`.
+Field domain tanpa kolom sheet (`Client.contactPerson/email`,
+`Venue.city/capacity`, `Delivery.deliveredAt`) tidak dipersist —
+didokumentasikan, schema sheet tidak diubah.
+
+## 5. CRUD Matrix (tervalidasi via service + real spreadsheet)
+
+| Entity | Create | Read | Update | Delete |
+|---|---|---|---|---|
+| Clients | PASS | PASS | PASS | PASS |
+| Vendors | PASS | PASS | PASS | PASS |
+| Venues | PASS | PASS | PASS | PASS |
+| Crew | PASS | PASS | PASS | PASS |
+| Jobs | PASS | PASS | PASS | PASS |
+| Job Crews | PASS | PASS | PASS | PASS |
+| Deliveries | PASS | PASS | PASS | PASS |
+| Client Payments | PASS | PASS | PASS | PASS |
+| Vendor Payments | PASS | PASS | PASS | PASS |
+| Expenses | PASS | PASS | PASS | PASS |
+| Admins | — (read-only by design) | PASS | — | — |
+
+## 6. Business Validation
+
+- Job XOR client/vendor: keduanya kosong atau keduanya terisi → ditolak
+  service maupun repository, tanpa silent fix — PASS.
+- Duplicate `job_number`: ditolak saat create maupun update — PASS.
+- Update/delete ID non-existent → error eksplisit — PASS.
+- Relation validation: `jobId`/`crewId` harus menunjuk record valid,
+  service menjadi penegak utamanya — PASS.
+- Payment rules mengikuti domain existing: `ClientPaymentTerm`
+  `TERMIN_1/2/3`, `VendorPaymentType` `DP/PELUNASAN`, crew
+  `paymentStatus` `UNPAID/PARTIAL/PAID`. Nilai dari prompt yang tidak ada
+  di enum existing (`FINAL_PAYMENT`, `payment_status: NOT_STARTED`,
+  `term: "1"`) ditolak eksplisit — domain TIDAK diperluas.
+- `created_at` dipertahankan saat update, `updated_at` berubah — PASS
+  (Job: `createdAt` sama, `updatedAt` refresh).
+- Timestamp: `now` ISO untuk create (keduanya) dan update (`updated_at`).
+- Header tidak pernah terhapus: seluruh operasi delete memakai
+  `deleteDimension` baris data; header divalidasi ulang di setiap read.
+
+## 7. UI
+
+CRUD minimal lewat `MasterDataCrud` (`src/components/master/master-crud.tsx`,
+Client Component) + server actions (`src/app/actions/master-actions.ts`) di
+empat route: `/clients`, `/vendors`, `/venues`, `/crew`. Tabel, tombol
+Tambah/Edit/Hapus, Modal form, EmptyState, dan error aman (pesan service,
+tanpa stack trace/credential). UI tidak memanggil Google API langsung;
+service tetap satu-satunya jalur. Job/Crew/Delivery/Payment/Expense CRUD
+tersedia di repository/service, UI-nya dijadwalkan pada fase berikutnya.
+
+## 8. Security
+
+- `.env.local` tetap ignored; private key/token/credential tidak masuk
+  source, audit, README, maupun log.
+- `admins.password_hash` tidak pernah masuk domain object/UI; admins
+  repository tidak memiliki method create/update/delete.
+- Error message Google tidak memuat secret (pesan dibungkus konteks
+  worksheet & operasi).
+
+## 9. Cleanup
+
+Seluruh TEST DATA (CRUD test + seed Phase 2F) dihapus. Final verification
+via project module: semua `getAll()` → `[]`,
+`jobs.getByJobNumber('TEST-...')` → `null`. 11 worksheet utuh, header
+identik Phase 2B.
+
+## 10. Validation
+
+- `npx tsc --noEmit`: PASS.
+- `npx eslint .`: PASS.
+- `npm run build`: PASS (11 route).
+- Runtime smoke: skrip CRUD test (phase2g-crud-test.mts) — 40+ assertion
+  PASS, lalu cleanup lengkap; dev server route master menampilkan data
+  TEST + tombol Tambah/Edit/Hapus — PASS.
+
+## 11. Scope Check
+
+- Tidak ada authentication/role/password management, dashboard redesign,
+  timeline, JobVendor, caching, pagination, ORM, dependency baru.
+- CRUD write untuk Job/JobCrew/Delivery/Payment/Expense siap di
+  repository/service; UI-nya belum dibuat (sesuai batasan).
+
+## 12. Definition of Done Phase 2G
+
+- [x] Repository contract mendukung write (mock & Google konsisten)
+- [x] Scope Google API mendukung write (`spreadsheets`)
+- [x] Domain → Sheet mapping tersedia dua arah
+- [x] CREATE/UPDATE/DELETE/READ bekerja pada real spreadsheet
+- [x] ID unique (generate + cek loop); job_number unique
+- [x] Job Client XOR Vendor divalidasi (dibuat & update, tanpa silent fix)
+- [x] Relation validation bekerja
+- [x] Payment rules mengikuti existing domain (UNPAID/PARTIAL/PAID,
+      TERMIN_1..3, DP/PELUNASAN)
+- [x] Header tidak pernah terhapus
+- [x] created_at dipertahankan, updated_at berubah saat update
+- [x] Optional field tidak menjadi string "undefined"/"null"
+- [x] Mock repository tetap valid & memenuhi kontrak
+- [x] Service tetap business layer; UI tidak direct Google API
+- [x] CRUD UI Clients/Vendors/Venues/Crew selesai
+- [x] Error UI aman
+- [x] Semua TEST DATA dihapus; spreadsheet kembali header-only
+- [x] tsc/eslint/build PASS; runtime smoke PASS
+- [x] Security check PASS; audit diperbarui
+
+Status akhir: **PHASE 2G — COMPLETED**.

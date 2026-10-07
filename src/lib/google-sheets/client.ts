@@ -12,7 +12,7 @@ import { google, type sheets_v4 } from "googleapis";
  * Google Sheets API. Mapping domain entity dan repository TIDAK ada di sini.
  */
 
-const SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"];
+const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
 export interface GoogleSheetsConfig {
   spreadsheetId: string;

@@ -1,15 +1,11 @@
-import {
-  Card,
-  EmptyState,
-  PageHeader,
-  TBody,
-  TD,
-  TH,
-  THead,
-  TR,
-  Table,
-} from "@/components/ui";
+import { PageHeader } from "@/components/ui";
+import { MasterDataCrud } from "@/components/master/master-crud";
 import { getVendors } from "@/services/master-service";
+import {
+  createVendorAction,
+  deleteVendorAction,
+  updateVendorAction,
+} from "@/app/actions/master-actions";
 
 export const metadata = {
   title: "Vendors · Air Production DB",
@@ -18,6 +14,13 @@ export const metadata = {
 export default async function VendorsPage() {
   const vendors = await getVendors();
 
+  const rows = vendors.map((vendor) => ({
+    id: vendor.id,
+    name: vendor.name,
+    phone: vendor.phone ?? "",
+    notes: vendor.notes ?? "",
+  }));
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -25,40 +28,26 @@ export default async function VendorsPage() {
         description="Vendor adalah pihak yang memberikan pekerjaan kepada Air Production, terpisah dari relasi client."
       />
 
-      <Card className="overflow-hidden">
-        {vendors.length === 0 ? (
-          <EmptyState
-            icon="vendors"
-            title="Belum ada vendor"
-            description="Data vendor yang tersimpan akan tampil di sini beserta kontak dan catatannya."
-          />
-        ) : (
-          <Table>
-            <THead>
-              <TR>
-                <TH>Nama Vendor</TH>
-                <TH>Contact Person</TH>
-                <TH>Telepon</TH>
-                <TH>Email</TH>
-                <TH>Catatan</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {vendors.map((vendor) => (
-                <TR key={vendor.id}>
-                  <TD className="font-medium text-ink">{vendor.name}</TD>
-                  <TD>{vendor.contactPerson ?? "-"}</TD>
-                  <TD className="whitespace-nowrap">{vendor.phone ?? "-"}</TD>
-                  <TD>{vendor.email ?? "-"}</TD>
-                  <TD className="max-w-xs text-ink-muted">
-                    {vendor.notes ?? "-"}
-                  </TD>
-                </TR>
-              ))}
-            </TBody>
-          </Table>
-        )}
-      </Card>
+      <MasterDataCrud
+        entityLabel="Vendor"
+        icon="vendors"
+        emptyTitle="Belum ada vendor"
+        emptyDescription="Data vendor yang tersimpan akan tampil di sini beserta kontak dan catatannya."
+        columns={[
+          { key: "name", label: "Nama Vendor" },
+          { key: "phone", label: "Kontak" },
+          { key: "notes", label: "Catatan" },
+        ]}
+        rows={rows}
+        fields={[
+          { key: "name", label: "Nama Vendor", required: true },
+          { key: "phone", label: "Kontak" },
+          { key: "notes", label: "Catatan", type: "textarea" },
+        ]}
+        createAction={createVendorAction}
+        updateAction={updateVendorAction}
+        deleteAction={deleteVendorAction}
+      />
     </div>
   );
 }

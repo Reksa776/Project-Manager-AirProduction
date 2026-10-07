@@ -320,3 +320,133 @@ export function mapAdmin(rec: Record<string, string>, sheet: SheetTitle, rowNumb
     email: requiredString(rec, "email", sheet, rowNumber),
   };
 }
+
+/* -------------------------------------------------------------------------- */
+/* Domain → Sheet (untuk operasi write)                                       */
+/* -------------------------------------------------------------------------- */
+
+function opt(v: string | undefined): string {
+  return v ?? "";
+}
+
+function num(v: number | undefined): string {
+  return v === undefined ? "" : String(v);
+}
+
+function assertEnumWrite<T extends string>(value: string, allowed: readonly T[], sheet: SheetTitle, column: string): void {
+  if (!allowed.includes(value as T)) {
+    throw new SheetMappingError(
+      `Nilai '${value}' tidak valid untuk kolom '${column}' pada worksheet '${sheet}'. Nilai yang diizinkan: ${allowed.join(", ")}.`,
+    );
+  }
+}
+
+function assertFiniteWrite(value: number, sheet: SheetTitle, column: string): void {
+  if (!Number.isFinite(value)) {
+    throw new SheetMappingError(`Nilai angka tidak valid untuk kolom '${column}' pada worksheet '${sheet}'.`);
+  }
+}
+
+/** Record ber-key nama header sheet, siap di-zip ke baris sesuai SHEET_HEADERS. */
+export type SheetRecord = Record<string, string>;
+
+/** Ubah SheetRecord menjadi array sel sesuai urutan header sheet. */
+export function recordToRow(sheet: SheetTitle, rec: SheetRecord): string[] {
+  return SHEET_HEADERS[sheet].map((h) => rec[h] ?? "");
+}
+
+export function clientToRecord(c: Client, createdAt: string, updatedAt: string): SheetRecord {
+  // `contactPerson` dan `email` tidak punya kolom di schema sheet — tidak dipersist.
+  return {
+    id: c.id, name: c.name, address: opt(c.address), contact: opt(c.phone),
+    notes: opt(c.notes), created_at: createdAt, updated_at: updatedAt,
+  };
+}
+
+export function vendorToRecord(v: Vendor, createdAt: string, updatedAt: string): SheetRecord {
+  return {
+    id: v.id, name: v.name, contact: opt(v.phone), notes: opt(v.notes),
+    created_at: createdAt, updated_at: updatedAt,
+  };
+}
+
+export function venueToRecord(v: Venue, createdAt: string, updatedAt: string): SheetRecord {
+  // `city` dan `capacity` tidak punya kolom di schema sheet — tidak dipersist.
+  return {
+    id: v.id, name: v.name, address: opt(v.address), contact: opt(v.contact),
+    notes: opt(v.notes), created_at: createdAt, updated_at: updatedAt,
+  };
+}
+
+export function crewToRecord(c: Crew, createdAt: string, updatedAt: string): SheetRecord {
+  assertFiniteWrite(c.defaultPayment, "crew", "default_payment");
+  return {
+    id: c.id, name: c.name, role: c.role, contact: opt(c.phone),
+    default_payment: String(c.defaultPayment), notes: opt(c.notes),
+    created_at: createdAt, updated_at: updatedAt,
+  };
+}
+
+export function jobToRecord(j: Job): SheetRecord {
+  assertEnumWrite(j.category, JOB_CATEGORIES, "jobs", "job_type");
+  assertEnumWrite(j.status, JOB_STATUSES, "jobs", "status");
+  return {
+    id: j.id, job_number: j.jobNumber, client_id: opt(j.clientId), vendor_id: opt(j.vendorId),
+    venue_id: opt(j.venueId), job_name: j.jobName, job_type: j.category,
+    execution_date: j.executionDate, location: opt(j.location), status: j.status,
+    description: opt(j.notes), created_at: j.createdAt, updated_at: j.updatedAt,
+  };
+}
+
+export function jobCrewToRecord(jc: JobCrew, createdAt: string, updatedAt: string): SheetRecord {
+  assertFiniteWrite(jc.actualPayment, "job_crews", "payment");
+  if (jc.paymentStatus !== undefined) {
+    assertEnumWrite(jc.paymentStatus, PAYMENT_STATUSES, "job_crews", "payment_status");
+  }
+  return {
+    id: jc.id, job_id: jc.jobId, crew_id: jc.crewId, role: jc.role,
+    payment: String(jc.actualPayment), payment_status: opt(jc.paymentStatus),
+    created_at: createdAt, updated_at: updatedAt,
+  };
+}
+
+export function deliveryToRecord(d: Delivery, createdAt: string, updatedAt: string): SheetRecord {
+  assertEnumWrite(d.status, DELIVERY_STATUSES, "deliveries", "status");
+  if (d.quantity !== undefined) assertFiniteWrite(d.quantity, "deliveries", "quantity");
+  return {
+    id: d.id, job_id: d.jobId, item_name: d.name, delivery_type: opt(d.deliveryType),
+    quantity: num(d.quantity), deadline: d.deadline, status: d.status,
+    notes: opt(d.notes), created_at: createdAt, updated_at: updatedAt,
+  };
+}
+
+export function clientPaymentToRecord(p: ClientPayment, createdAt: string, updatedAt: string): SheetRecord {
+  assertEnumWrite(p.term, CLIENT_PAYMENT_TERMS, "client_payments", "term");
+  assertEnumWrite(p.status, PAYMENT_STATUSES, "client_payments", "status");
+  assertFiniteWrite(p.amount, "client_payments", "amount");
+  return {
+    id: p.id, job_id: p.jobId, term: p.term, amount: String(p.amount),
+    due_date: opt(p.dueDate), paid_date: opt(p.paidDate), status: p.status,
+    notes: opt(p.notes), created_at: createdAt, updated_at: updatedAt,
+  };
+}
+
+export function vendorPaymentToRecord(p: VendorPayment, createdAt: string, updatedAt: string): SheetRecord {
+  assertEnumWrite(p.type, VENDOR_PAYMENT_TYPES, "vendor_payments", "type");
+  assertEnumWrite(p.status, PAYMENT_STATUSES, "vendor_payments", "status");
+  assertFiniteWrite(p.amount, "vendor_payments", "amount");
+  return {
+    id: p.id, job_id: p.jobId, type: p.type, amount: String(p.amount),
+    due_date: opt(p.dueDate), paid_date: opt(p.paidDate), status: p.status,
+    notes: opt(p.notes), created_at: createdAt, updated_at: updatedAt,
+  };
+}
+
+export function expenseToRecord(e: Expense, createdAt: string, updatedAt: string): SheetRecord {
+  assertFiniteWrite(e.amount, "expenses", "amount");
+  return {
+    id: e.id, job_id: e.jobId, category: e.category, description: e.description,
+    amount: String(e.amount), expense_date: e.date, notes: opt(e.notes),
+    created_at: createdAt, updated_at: updatedAt,
+  };
+}
