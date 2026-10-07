@@ -1362,3 +1362,182 @@ tetap di domain/service, bukan di repository.
 - [x] Audit diperbarui
 
 Status akhir: **PHASE 2E — COMPLETED**.
+
+---
+
+# FREEBUFF AUDIT — PHASE 2F (GOOGLE SHEETS READ VALIDATION)
+
+## 1. Status
+
+**COMPLETED**
+
+Phase 2F memvalidasi read path Google Sheets → Repository → Service → UI
+dengan data TEST sementara. Seluruh data TEST sudah dihapus kembali.
+
+## 2. Metode
+
+- Data TEST (id berawalan `TEST-`) ditulis ke spreadsheet memakai skrip
+  sementara di luar repository (JWT + `googleapis`, scope `spreadsheets`
+  hanya untuk skrip, bukan untuk client aplikasi). Skrip seed/cleanup
+  TIDAK masuk repository.
+- Validasi read dilakukan memakai module project asli
+  (`@/repositories/google`, `@/repositories/google/mapping`,
+  `@/services/*`) melalui node strip-types + alias loader.
+- Validasi UI memakai dev server per-request (lihat Catatan Static
+  Prerender di bagian 8).
+- Setelah semua validasi, seluruh TEST DATA dihapus (`values.clear` pada
+  range `A2:Z1000` per worksheet) dan final read verification dijalankan.
+
+## 3. Field Validation
+
+| Sheet Field | Domain Field | Result |
+|---|---|---|
+| clients.address | Client.address | PASS |
+| clients.contact | Client.phone | PASS |
+| clients.notes | Client.notes | PASS |
+| vendors.contact | Vendor.phone | PASS |
+| vendors.notes | Vendor.notes | PASS |
+| venues.address | Venue.address | PASS |
+| venues.contact | Venue.contact | PASS |
+| venues.notes | Venue.notes | PASS |
+| crew.default_payment | Crew.defaultPayment (number) | PASS |
+| crew.notes | Crew.notes | PASS |
+| jobs.location | Job.location | PASS |
+| jobs.description | Job.notes | PASS |
+| job_crews.payment | JobCrew.actualPayment (number) | PASS |
+| job_crews.payment_status | JobCrew.paymentStatus | PASS |
+| deliveries.delivery_type | Delivery.deliveryType | PASS |
+| deliveries.quantity | Delivery.quantity (number) | PASS |
+| deliveries.notes | Delivery.notes | PASS |
+| client_payments.amount | ClientPayment.amount (number) | PASS |
+| client_payments.paid_date (kosong) | ClientPayment.paidDate → undefined | PASS |
+| client_payments.notes | ClientPayment.notes | PASS |
+| client_payments.term | ClientPayment.term (TERMIN_1) | PASS |
+| client_payments.status | ClientPayment.status (UNPAID) | PASS |
+| vendor_payments.amount | VendorPayment.amount (number) | PASS |
+| vendor_payments.notes | VendorPayment.notes | PASS |
+| expenses.amount | Expense.amount (number) | PASS |
+| expenses.notes | Expense.notes | PASS |
+| admins.password_hash | — (TIDAK dibawa ke domain) | PASS |
+
+## 4. Mapper Validation
+
+- Number parsing: `'1500000'` → 1500000, `'1.500.000'` → 1500000,
+  `'1,500,000'` → 1500000, `'250000'` → 250000 — semua PASS.
+  `'abc'` → error eksplisit; wajib kosong → error eksplisit.
+  Tidak ada string/NaN/undefined diam-diam/default 0.
+- Enum normalisasi: `'in progress'` → `IN_PROGRESS` — PASS.
+  Nilai invalid (`'SELESAI'`) → error eksplisit.
+  `payment_status: 'NOT_STARTED'` → error eksplisit karena enum
+  `PaymentStatus` adalah `UNPAID/PARTIAL/PAID` (sesuai domain existing;
+  enum TIDAK diperluas untuk test).
+- Empty optional value: `paid_date`/`due_date`/`notes` kosong →
+  `undefined` (bukan `""`, `"undefined"`, `"null"`, `NaN`, `null`).
+- Column shift: baris `TEST-CLIENT-002` dengan `address` kosong dan
+  `contact` terisi → `Client.address === undefined`, `Client.phone ===
+  'Test Contact Two'`, `Client.notes` benar — tidak ada pergeseran kolom.
+- Header validation otomatis berjalan di setiap `getAll()`; mismatch
+  header → error eksplisit.
+
+## 5. Repository Method Validation
+
+Semua method dikontrak `DataRepositories` lulus:
+`jobs.getAll/getById/getByJobNumber`, `clients.getAll/getById`,
+`vendors.getAll/getById`, `venues.getAll/getById`, `crew.getAll/getById`,
+`jobCrews.getAll/getById/getByJobId`, `deliveries.getAll/getById/getByJobId`,
+`clientPayments.getAll/getById/getByJobId`, `vendorPayments.getAll/getById/getByJobId`,
+`expenses.getAll/getById/getByJobId`, `admins.getAll/getById`.
+
+Relationship via ID divalidasi memakai `getByJobId` — repository TIDAK
+melakukan automatic join (sesuai architecture existing).
+
+## 6. Client XOR Vendor Invariant
+
+Repository memetakan apa adanya dan TIDAK melakukan silent fix:
+- Case A (client saja): `clientId` terisi, `vendorId` undefined — PASS.
+- Case B (vendor saja): `vendorId` terisi, `clientId` undefined — PASS.
+- Case C (keduanya kosong): kembali dengan `clientId`/`vendorId` undefined
+  apa adanya, bukan diisi paksa — PASS.
+- Case D (keduanya terisi): kembali dengan keduanya terisi, bukan
+  dihapus/dipilih salah satu — PASS.
+
+## 7. Service Validation
+
+Melalui module project asli (bukan bypass repository):
+- `getJobListItems()` berisi `TEST-2026-001`.
+- `getJobDetail('TEST-2026-001')`: counterparty "Test Client", venue
+  "Test Venue", 1 assignment (crew "Test Crew"), 1 delivery, 1
+  clientPayment, 1 expense.
+- `getDashboardData()`: totalJobs ≥ 4, Incoming Wedding berisi
+  "Test Wedding", Incoming Editing berisi "Test Highlight Video".
+- `getClients/getVendors/getVenues/getCrew/getCurrentAdmin` dan
+  `getFinanceOverview()` membaca data TEST.
+
+## 8. UI Validation
+
+- Semua 8 route (`/dashboard`, `/jobs`, `/jobs/TEST-2026-001`,
+  `/clients`, `/vendors`, `/crew`, `/venues`, `/finance`) HTTP 200 pada
+  dev server; HTML mengandung data TEST; tidak ada mock data
+  ("Andrea"/"Grand Ballroom"); tidak ada error runtime di log server.
+- **Catatan Static Prerender** (bukan bug baru; perilaku Next.js App
+  Router): route `○ (Static)` pada production build di-render sekali saat
+  `npm run build`, sehingga HTML statis mencerminkan isi spreadsheet pada
+  waktu build. Route dinamis `/jobs/[jobNumber]` (`ƒ`) selalu membaca
+  live. Ini batasan caching/static-render, di luar scope Phase 2F; tidak
+  ada `fetch` caching tambahan yang ditambahkan.
+
+## 9. Cleanup & Final Verification
+
+- Seluruh TEST DATA dihapus (`values.clear` `A2:Z1000` per worksheet).
+- Read-back per raw: setiap worksheet hanya 1 baris (header).
+- Final verification via project module: semua `getAll()` → `[]`,
+  `jobs.getByJobNumber('TEST-2026-001')` → `null`.
+- 11 worksheet utuh; header divalidasi identik dengan Phase 2B
+  (`validateHeaders` berjalan setiap read; tidak ada error).
+- Scope write (`spreadsheets`) hanya dipakai skrip sementara; client
+  aplikasi tetap `spreadsheets.readonly`.
+
+## 10. Security
+
+- `admins.password_hash` (TEST_PASSWORD_HASH_NOT_REAL) tidak pernah
+  masuk domain object (key tidak ada di `Admin`), tidak tampil di UI,
+  tidak dicetak di log/audit, dan sudah dihapus dari spreadsheet.
+- Tidak ada secret/token/JWT/private key di source, audit, README, log.
+
+## 11. Scope Check
+
+- Hanya READ VALIDATION. Tidak ada CRUD production, form, API endpoint
+  write, authentication, dashboard redesign, dependency baru, atau
+  refactor besar. Skrip temporary seed/cleanup berada di luar repository
+  dan tidak meninggalkan artefak di source.
+
+## 12. Validation Project
+
+- `npx tsc --noEmit`: PASS (exit 0).
+- `npx eslint .`: PASS (exit 0).
+- `npm run build`: PASS (11 route).
+- Runtime smoke test dev server (8 route): PASS.
+
+## 13. Definition of Done Phase 2F
+
+- [x] Read path Sheets → Repository → Service → UI terbukti bekerja
+- [x] Data validation sementara berhasil dibaca
+- [x] Field business Phase 2E tidak hilang
+- [x] Client.address / Job.location / JobCrew.paymentStatus /
+      Delivery.deliveryType / Delivery.quantity / Venue.contact / notes
+      terbaca benar
+- [x] Job.description → Job.notes tetap benar
+- [x] Number parsing tervalidasi
+- [x] Enum normalization tervalidasi
+- [x] Empty optional values tervalidasi
+- [x] Column shift tervalidasi
+- [x] getById / getByJobId / getByJobNumber tervalidasi
+- [x] Service tervalidasi; UI smoke test tervalidasi
+- [x] Client XOR Vendor invariant tidak di-silent-fix
+- [x] password_hash tidak masuk domain/log/UI
+- [x] Semua test data DIHAPUS; spreadsheet kembali hanya header
+- [x] 11 worksheet utuh; tidak ada perubahan header
+- [x] Tidak ada CRUD production; tidak ada credential leakage
+- [x] tsc/eslint/build PASS; audit diperbarui
+
+Status akhir: **PHASE 2F — COMPLETED**.
