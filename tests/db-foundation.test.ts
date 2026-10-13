@@ -77,7 +77,7 @@ describe("koneksi", () => {
   it("setiap koneksi memakai timezone UTC (+00:00)", async () => {
     const zones = new Set<string>();
     for (let i = 0; i < 12; i += 1) {
-      const list = await rows<{ tz: string }>("SELECT @@session.time_zone AS tz");
+      const list = await rows<{ tz: string }>("SHOW timezone AS tz");
       zones.add(list[0]?.tz ?? "");
     }
     expect([...zones]).toEqual(["+00:00"]);

@@ -16,8 +16,8 @@ export function ensureEnvFileLoaded(): void {
 
 /**
  * Baca dan validasi DATABASE_URL.
- * Fail-loud bila kosong / bukan connection string mysql://.
- * Seluruh selubung tanda kutip dilepas agar aman untuk format `DATABASE_URL="mysql://..."`.
+ * Fail-loud bila kosong / bukan connection string postgresql://.
+ * Seluruh selubung tanda kutip dilepas agar aman untuk format `DATABASE_URL="postgres://..."`.
  */
 export function getDatabaseUrl(): string {
   ensureEnvFileLoaded();
@@ -37,8 +37,8 @@ export function getDatabaseUrl(): string {
     url = url.slice(1, -1);
   }
 
-  if (!/^mysql:\/\//i.test(url)) {
-    throw new Error("DATABASE_URL tidak valid: harus diawali dengan skema mysql://.");
+  if (!/^postgresql:/i.test(url) && !/^postgres:/i.test(url)) {
+    throw new Error("DATABASE_URL tidak valid: harus diawali dengan skema postgresql:// atau postgres://.");
   }
 
   return url;

@@ -1,13 +1,9 @@
 import path from "node:path";
-import { drizzle } from "drizzle-orm/mysql2";
-import { migrate } from "drizzle-orm/mysql2/migrator";
-import mysql from "mysql2/promise";
+import { drizzle } from "drizzle-orm/postgres";
+import { migrate } from "drizzle-orm/postgres/migrator";
+import { Pool } from "pg";
 import { ensureEnvFileLoaded } from "@/db/env";
-import {
-  ensureTestDatabase,
-  dropAllTestTables,
-  resolveTestDatabaseUrl,
-} from "./helpers/db";
+import { ensureTestDatabase, dropAllTestTables, resolveTestDatabaseUrl } from "./helpers/db";
 
 /**
  * Setup Vitest Phase 1 — database smoke test.
@@ -21,6 +17,7 @@ import {
  *
  * Database produksi `database-airprod` TIDAK PERNAH disentuh oleh test ini.
  */
+
 ensureEnvFileLoaded();
 
 // 1. Guard: DATABASE_URL harus menunjuk database produksi sebelum diubah apa pun.
@@ -37,7 +34,7 @@ process.env.DATABASE_URL = testUrl;
 await dropAllTestTables(testUrl);
 
 // 5. Apply migration dari folder `drizzle/` (deterministik, dari git).
-const pool = mysql.createPool({ uri: testUrl, multipleStatements: true, dateStrings: true });
+const pool = new Pool({ connectionString: testUrl, multipleStatements: true });
 try {
   const db = drizzle(pool);
   await migrate(db, { migrationsFolder: path.resolve(process.cwd(), "drizzle") });

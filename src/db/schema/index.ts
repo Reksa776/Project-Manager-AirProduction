@@ -1,8 +1,9 @@
 /**
- * Barrel seluruh tabel MySQL (Phase 1 — 13 tabel).
+ * Barrel seluruh tabel PostgreSQL (Phase 3 — migrasi MySQL → PostgreSQL).
  *
- * Tabel yang TIDAK ada secara sengaja: `venues` (konsep dihapus) dan
- * `expenses` (digantikan cashflows dengan direction=EXPENSE).
+ * Tabel yang ada: 13 tabel lengkap.
+ * Tabel yang TIDAK ada: venues (konsep dihapus) dan expenses
+ * (digantikan cashflows dengan direction=EXPENSE).
  */
 
 export { admins } from "./admins";

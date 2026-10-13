@@ -14,10 +14,12 @@
     "db:check": "drizzle-kit check"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.7",
     "drizzle-orm": "^0.45.3",
     "googleapis": "^183.0.0",
     "mysql2": "^3.24.5",
     "next": "16.3.8",
+    "pg": "^8.23.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "zod": "^4.6.5"
@@ -28,6 +30,7 @@
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",
     "@types/node": "^24.19.1",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.11",

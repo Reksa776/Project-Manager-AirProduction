@@ -1,16 +1,17 @@
-import { int, mysqlTable, smallint } from "drizzle-orm/mysql-core";
+import { pgTable, check, sql, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 
 /**
- * job_sequences — counter generator nomor job `JOB-YYYY-NNNNNN`.
- *
- * Phase 1 HANYA membuat tabelnya. Generator (SELECT ... FOR UPDATE di dalam
- * transaksi) diimplementasikan pada Phase business logic berikutnya.
- *
- * Catatan penyimpangan kecil dari aturan PK "VARCHAR(36) untuk semua tabel":
- * PK tabel ini adalah `year` (SMALLINT) — bukan auto-increment, dan bukan data
- * hasil migrasi; year adalah kunci sekuens per-tahun sesuai desain Phase 0 §10.
+ * job_sequences — nomor urut otomatis per bulan/tahun untuk job numbering.
+ * Digunakan generator di aplikasi untuk format `JOB-YYYY-NNNNNN`.
  */
-export const jobSequences = mysqlTable("job_sequences", {
-  year: smallint("year").primaryKey(),
-  nextSeq: int("next_seq").notNull(),
-});
+export const jobSequences = pgTable("job_sequences", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(),
+  currentSeq: integer("current_seq").notNull().default(0),
+  ...timestamps(),
+}, (t) => ({
+  uqYearMonth: uniqueIndex("uq_job_sequences_year_month").on(t.year, t.month),
+}));
+
+export const jobSequenceRelations = relations(jobSequences, many(jobs));

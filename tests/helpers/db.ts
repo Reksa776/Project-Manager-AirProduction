@@ -1,4 +1,4 @@
-import mysql from "mysql2/promise";
+import { Pool } from "pg";
 import { ensureEnvFileLoaded, getDatabaseUrl } from "@/db/env";
 
 /**
@@ -13,7 +13,7 @@ import { ensureEnvFileLoaded, getDatabaseUrl } from "@/db/env";
 export const PROD_DATABASE = "database-airprod";
 export const TEST_DATABASE = "airprod_test";
 
-/** Ganti nama database pada connection string mysql:// (tanpa mencetak URL). */
+/** Ganti nama database pada connection string postgresql:// (tidak mencetak URL). */
 export function replaceDatabaseName(url: string, dbName: string): string {
   const parsed = new URL(url);
   parsed.pathname = `/${dbName}`;
@@ -41,10 +41,10 @@ export function resolveTestDatabaseUrl(): string {
 /** Koneksi admin (tanpa schema) — hanya untuk CREATE DATABASE test. */
 export async function ensureTestDatabase(): Promise<void> {
   const adminUrl = replaceDatabaseName(getDatabaseUrl(), "information_schema");
-  const conn = await mysql.createConnection({ uri: adminUrl });
+  const conn = new Pool({ connectionString: adminUrl });
   try {
     await conn.query(
-      `CREATE DATABASE IF NOT EXISTS \`${TEST_DATABASE}\` CHARACTER SET utf8mb4`,
+      `CREATE DATABASE IF NOT EXISTS "${TEST_DATABASE}" CHARACTER SET utf8mb4`,
     );
   } finally {
     await conn.end();
@@ -56,15 +56,15 @@ export async function dropAllTestTables(testUrl: string): Promise<void> {
   if (new URL(testUrl).pathname !== `/${TEST_DATABASE}`) {
     throw new Error("STOP: dropAllTestTables hanya boleh menerima URL database test.");
   }
-  const conn = await mysql.createConnection({ uri: testUrl });
+  const conn = new Pool({ connectionString: testUrl });
   try {
     await conn.query("SET FOREIGN_KEY_CHECKS = 0");
     const [rows] = (await conn.query(
       "SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?",
       [TEST_DATABASE],
-    )) as unknown as [Array<{ name: string }>];
+    )) as unknown as Array<{ name: string }>;
     for (const row of rows) {
-      await conn.query(`DROP TABLE IF EXISTS \`${row.name}\``);
+      await conn.query(`DROP TABLE IF EXISTS "${row.name}"`);
     }
     await conn.query("SET FOREIGN_KEY_CHECKS = 1");
   } finally {

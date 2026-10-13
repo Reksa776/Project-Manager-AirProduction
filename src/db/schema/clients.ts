@@ -1,5 +1,4 @@
-import { mysqlTable, text, varchar } from "drizzle-orm/mysql-core";
-import { timestamps } from "./_shared";
+import { pgTable, text, varchar } from "drizzle-orm/pg-core";
 
 /**
  * clients — master client.
@@ -7,7 +6,7 @@ import { timestamps } from "./_shared";
  * (belum pernah terpersist di Google Sheets → NULL saat migrasi).
  * phone berasal dari kolom sheet `contact` lama.
  */
-export const clients = mysqlTable("clients", {
+export const clients = pgTable("clients", {
   id: varchar("id", { length: 36 }).primaryKey(),
   name: varchar("name", { length: 120 }).notNull(),
   companyName: varchar("company_name", { length: 120 }),

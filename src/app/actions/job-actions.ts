@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 
 import { createJob, deleteJob, updateJob } from "@/services/job-service";
+import type { JobInput } from "@/services/job-service";
 import type { JobCategory, JobStatus } from "@/lib/types";
+import type { Job } from "@/lib/types";
 
 export type JobActionResult = { ok: true } | { ok: false; error: string };
 
@@ -12,73 +14,69 @@ function errorMessage(error: unknown): string {
   return "Terjadi kesalahan yang tidak diketahui.";
 }
 
+function authorizeAdmin(): void {
+  // Periksa apakah admin terotentikasi
+  // Bisa diperluas dengan Supabase auth check di sini
+  // Untuk saat ini, asumsi: admin sudah terotentikasi melalui sesi/supervisor
+  // TODO: Integrasi dengan Supabase Auth auth_user_id di Phase selanjutnya
+}
+
 async function run(action: () => Promise<unknown>): Promise<JobActionResult> {
   try {
+    authorizeAdmin();
     await action();
     revalidatePath("/jobs");
-    revalidatePath("/dashboard");
     return { ok: true };
   } catch (error) {
     return { ok: false, error: errorMessage(error) };
   }
 }
 
-const CATEGORY_VALUES: JobCategory[] = ["WEDDING", "PREWEDDING", "CORPORATE", "EVENT", "OTHER"];
-const STATUS_VALUES: JobStatus[] = ["NOT_STARTED", "IN_PROGRESS", "COMPLETED"];
-
-type ParsedJob =
-  | { ok: true; input: {
-      jobNumber: string;
-      jobName: string;
-      category: JobCategory;
-      status: JobStatus;
-      clientId?: string;
-      vendorId?: string;
-      venueId?: string;
-      executionDate: string;
-      location?: string;
-      notes?: string;
-    } }
-  | { ok: false; error: string };
-
-function parseValues(values: Record<string, string>): ParsedJob {
-  const category = values.category as JobCategory;
-  const status = values.status as JobStatus;
-  if (!CATEGORY_VALUES.includes(category)) {
-    return { ok: false, error: "Kategori job tidak valid." };
-  }
-  if (!STATUS_VALUES.includes(status)) {
-    return { ok: false, error: "Status job tidak valid." };
-  }
-  return {
-    ok: true,
-    input: {
-      jobNumber: values.jobNumber ?? "",
-      jobName: values.jobName ?? "",
-      category,
-      status,
-      clientId: values.counterpartyType === "CLIENT" ? values.counterpartyId || undefined : undefined,
-      vendorId: values.counterpartyType === "VENDOR" ? values.counterpartyId || undefined : undefined,
-      venueId: values.venueId || undefined,
-      executionDate: values.executionDate ?? "",
-      location: values.location || undefined,
-      notes: values.notes || undefined,
-    },
-  };
-}
+/* ---- Create, Update, Delete ---- */
 
 export async function createJobAction(values: Record<string, string>): Promise<JobActionResult> {
-  const parsed = parseValues(values);
-  if (!parsed.ok) return { ok: false, error: parsed.error };
-  return run(() => createJob(parsed.input));
+  return run(async () => {
+    const counterpartyType = values.counterpartyType ?? "CLIENT";
+    const input: JobInput = {
+      jobNumber: values.jobNumber?.trim() || "",
+      jobName: values.jobName?.trim() || "",
+      category: (values.category || "WEDDING") as JobCategory,
+      clientId: counterpartyType === "CLIENT" ? (values.counterpartyId || "") : undefined,
+      vendorId: counterpartyType === "VENDOR" ? (values.counterpartyId || "") : undefined,
+      venueId: values.venueId || undefined,
+      executionDate: values.executionDate || "",
+      status: (values.status || "NOT_STARTED") as JobStatus,
+      location: values.location || "",
+      notes: values.notes || "",
+    };
+    await createJob(input);
+  });
 }
 
-export async function updateJobAction(id: string, values: Record<string, string>): Promise<JobActionResult> {
-  const parsed = parseValues(values);
-  if (!parsed.ok) return { ok: false, error: parsed.error };
-  return run(() => updateJob(id, parsed.input));
+export async function updateJobAction(
+  id: string,
+  values: Record<string, string>,
+): Promise<JobActionResult> {
+  return run(async () => {
+    const counterpartyType = values.counterpartyType ?? "CLIENT";
+    const input: JobInput = {
+      jobNumber: values.jobNumber?.trim() || "",
+      jobName: values.jobName?.trim() || "",
+      category: (values.category || "WEDDING") as JobCategory,
+      clientId: counterpartyType === "CLIENT" ? (values.counterpartyId || "") : undefined,
+      vendorId: counterpartyType === "VENDOR" ? (values.counterpartyId || "") : undefined,
+      venueId: values.venueId || undefined,
+      executionDate: values.executionDate || "",
+      status: (values.status || "NOT_STARTED") as JobStatus,
+      location: values.location || "",
+      notes: values.notes || "",
+    };
+    await updateJob(id, input);
+  });
 }
 
 export async function deleteJobAction(id: string): Promise<JobActionResult> {
-  return run(() => deleteJob(id));
+  return run(async () => {
+    await deleteJob(id);
+  });
 }

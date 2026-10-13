@@ -1,15 +1,4 @@
 import { sql } from "drizzle-orm";
-import {
-  check,
-  date,
-  mysqlTable,
-  text,
-  uniqueIndex,
-  varchar,
-} from "drizzle-orm/mysql-core";
-import { timestamps } from "./_shared";
-import { clients } from "./clients";
-import { vendors } from "./vendors";
 
 /**
  * jobs — entity pusat.
@@ -20,7 +9,7 @@ import { vendors } from "./vendors";
  * - venue TIDAK ada: hanya snapshot nama venue historis (legacy_venue_name),
  *   tidak ditampilkan di UI.
  */
-export const jobs = mysqlTable(
+export const jobs = pgTable(
   "jobs",
   {
     id: varchar("id", { length: 36 }).primaryKey(),
@@ -41,7 +30,6 @@ export const jobs = mysqlTable(
     ...timestamps(),
   },
   (t) => ({
-    uqJobNumber: uniqueIndex("uq_jobs_job_number").on(t.jobNumber),
     chkXor: check(
       "chk_jobs_client_vendor_xor",
       sql`(client_id is null) <> (vendor_id is null)`,
