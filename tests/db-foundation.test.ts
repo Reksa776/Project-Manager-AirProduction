@@ -77,7 +77,8 @@ describe("koneksi", () => {
   it("setiap koneksi memakai timezone UTC (+00:00)", async () => {
     const zones = new Set<string>();
     for (let i = 0; i < 12; i += 1) {
-      const list = await rows<{ tz: string }>("SHOW timezone AS tz");
+      // MariaDB tidak menerima alias pada `SHOW`; gunakan variabel sesi eksplisit.
+      const list = await rows<{ tz: string }>("SELECT @@session.time_zone AS tz");
       zones.add(list[0]?.tz ?? "");
     }
     expect([...zones]).toEqual(["+00:00"]);
@@ -112,14 +113,14 @@ describe("insert & relasi", () => {
       id: crewId,
       name: `Crew ${crewId.slice(0, 6)}`,
       crewRoleId: roleId,
-      defaultPayment: 500000,
+      defaultPayment: "500000.00",
     });
     await db.insert(jobCrews).values({
       id: assignmentId,
       jobId,
       crewId,
       crewRoleId: null, // NULL → mengikuti role dari crew (Phase 14)
-      agreedAmount: 750000,
+      agreedAmount: "750000.00",
     });
     await db.insert(cashflows).values({
       id: cashflowId,
@@ -127,7 +128,7 @@ describe("insert & relasi", () => {
       occurredOn: "2026-10-10",
       direction: "INCOME",
       category: "CLIENT_PAYMENT",
-      amount: 5000000,
+      amount: "5000000.00",
       description: "Termin 1",
     });
 
@@ -155,7 +156,7 @@ describe("insert & relasi", () => {
         id: randomUUID(),
         jobId: randomUUID(),
         crewId: randomUUID(),
-        agreedAmount: 0,
+        agreedAmount: "0.00",
       }),
       /foreign key constraint fails/i,
     );
@@ -217,7 +218,7 @@ describe("CHECK constraints", () => {
         occurredOn: "2026-11-01",
         direction: "EXPENSE",
         category: "OTHER",
-        amount: 0,
+        amount: "0.00",
         description: "nol",
       }),
       /chk_cashflows_amount_positive/i,
@@ -230,7 +231,7 @@ describe("CHECK constraints", () => {
         occurredOn: "2026-11-01",
         direction: "EXPENSE",
         category: "OTHER",
-        amount: -1000,
+        amount: "-1000.00",
         description: "negatif",
       }),
       /chk_cashflows_amount_positive/i,
@@ -251,7 +252,7 @@ describe("CHECK constraints", () => {
         occurredOn: "2026-11-01",
         direction: "INCOME",
         category: "CREW_PAYMENT",
-        amount: 1000,
+        amount: "1000.00",
         description: "ganda arah",
       }),
       /chk_cashflows_direction_category/i,
@@ -265,7 +266,7 @@ describe("CHECK constraints", () => {
         occurredOn: "2026-11-01",
         direction: "EXPENSE",
         category: "CLIENT_PAYMENT",
-        amount: 1000,
+        amount: "1000.00",
         description: "ganda arah 2",
       }),
       /chk_cashflows_direction_category/i,
@@ -285,7 +286,7 @@ describe("CHECK constraints", () => {
         occurredOn: "2026-11-01",
         direction: "EXPENSE",
         category: "CREW_PAYMENT",
-        amount: 1000,
+        amount: "1000.00",
         description: "referensi setengah",
         referenceType: "job_crew",
         referenceId: null,
@@ -307,7 +308,7 @@ describe("CHECK constraints", () => {
         occurredOn: "2026-11-01",
         direction: "EXPENSE",
         category: "OTHER",
-        amount: 1000,
+        amount: "1000.00",
         description: "sumber asing",
         source: "LEGACY" as unknown as "MANUAL",
       }),
@@ -399,7 +400,7 @@ describe("FK RESTRICT & CASCADE", () => {
       occurredOn: "2026-12-05",
       direction: "INCOME",
       category: "CLIENT_PAYMENT",
-      amount: 100000,
+      amount: "100000.00",
       description: "DP",
     });
 
@@ -418,13 +419,13 @@ describe("FK RESTRICT & CASCADE", () => {
       id: crewId,
       name: `Crew ${crewId.slice(0, 6)}`,
       crewRoleId: roleId,
-      defaultPayment: 0,
+      defaultPayment: "0.00",
     });
     await db.insert(jobCrews).values({
       id: randomUUID(),
       jobId,
       crewId,
-      agreedAmount: 50000,
+      agreedAmount: "50000.00",
     });
 
     await rejectsWith(
@@ -443,14 +444,14 @@ describe("FK RESTRICT & CASCADE", () => {
       id: crewId,
       name: `Crew ${crewId.slice(0, 6)}`,
       crewRoleId: roleId,
-      defaultPayment: 0,
+      defaultPayment: "0.00",
     });
 
     await db.insert(jobCrews).values({
       id: randomUUID(),
       jobId,
       crewId,
-      agreedAmount: 100000,
+      agreedAmount: "100000.00",
     });
     await db.insert(deliveries).values({
       id: randomUUID(),

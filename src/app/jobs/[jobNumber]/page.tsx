@@ -2,13 +2,18 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Icon } from "@/components/icons";
+import { AppShell } from "@/components/layout/app-shell";
 import { JobDetailTabs } from "@/components/jobs/job-detail-tabs";
 import { EditJobButton } from "@/components/jobs/edit-job-button";
 import { JobStatusBadge } from "@/components/ui";
 import { getJobDetail } from "@/services/job-service";
-import { getClients, getCrew, getVendors, getVenues } from "@/services/master-service";
+import { getClients, getCrew, getCrewRoles, getVendors } from "@/services/master-service";
 import { JOB_CATEGORY_LABEL, JOB_STATUS_LABEL } from "@/lib/labels";
 import { formatShortDate } from "@/lib/utils";
+import { requireAuthenticatedAdmin } from "@/lib/auth";
+
+// Data MySQL dibaca saat runtime; tidak diprerender statis.
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -24,6 +29,7 @@ export default async function JobDetailPage({
 }: {
   params: Promise<{ jobNumber: string }>;
 }) {
+  const admin = await requireAuthenticatedAdmin();
   const { jobNumber } = await params;
   const detail = await getJobDetail(jobNumber);
 
@@ -31,22 +37,23 @@ export default async function JobDetailPage({
     notFound();
   }
 
-  const { job, counterparty, venue } = detail;
-  const [clients, vendors, venues, crew] = await Promise.all([
+  const { job, counterparty } = detail;
+  const [clients, vendors, crew, crewRoles] = await Promise.all([
     getClients(),
     getVendors(),
-    getVenues(),
     getCrew(),
+    getCrewRoles(),
   ]);
 
   return (
+    <AppShell adminName={admin.name}>
     <div className="space-y-6">
       <Link
         href="/jobs"
         className="inline-flex items-center gap-1.5 text-[13px] text-ink-soft transition-colors hover:text-ink"
       >
         <Icon name="chevronLeft" className="h-4 w-4" />
-        Kembali ke daftar Jobs
+        Back ke daftar Jobs
       </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -63,7 +70,6 @@ export default async function JobDetailPage({
             counterpartyId={counterparty.id}
             clients={clients}
             vendors={vendors}
-            venues={venues}
           />
           <JobStatusBadge status={job.status} />
         </div>
@@ -71,21 +77,18 @@ export default async function JobDetailPage({
 
       <dl className="grid grid-cols-1 gap-6 rounded-xl border border-line bg-panel px-6 py-5 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
         <MetaItem
-          label={counterparty.type === "VENDOR" ? "Vendor" : counterparty.type === "CLIENT" ? "Client" : "Counterparty"}
+          label={counterparty.type === "VENDOR" ? "Vendor" : "Client"}
           value={counterparty.name}
         />
-        <MetaItem
-          label="Execution Date"
-          value={formatShortDate(job.executionDate)}
-        />
-        <MetaItem label="Venue" value={venue?.name ?? "-"} />
+        <MetaItem label="Execution Date" value={formatShortDate(job.executionDate)} />
         <MetaItem label="Location" value={job.location ?? "-"} />
-        <MetaItem label="Kategori" value={JOB_CATEGORY_LABEL[job.category]} />
+        <MetaItem label="Category" value={JOB_CATEGORY_LABEL[job.category]} />
         <MetaItem label="Status" value={JOB_STATUS_LABEL[job.status]} />
       </dl>
 
-      <JobDetailTabs detail={detail} crew={crew} />
+      <JobDetailTabs detail={detail} crew={crew} crewRoles={crewRoles} />
     </div>
+    </AppShell>
   );
 }
 

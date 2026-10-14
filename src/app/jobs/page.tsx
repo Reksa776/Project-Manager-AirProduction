@@ -1,7 +1,9 @@
 import { JobsTable } from "@/components/jobs/jobs-table";
+import { AppShell } from "@/components/layout/app-shell";
 import { PageHeader } from "@/components/ui";
-import { getClients, getVendors, getVenues } from "@/services/master-service";
+import { getClients, getPackages, getVendors } from "@/services/master-service";
 import { getJobListItems } from "@/services/job-service";
+import { requireAuthenticatedAdmin } from "@/lib/auth";
 import {
   createJobAction,
   deleteJobAction,
@@ -12,29 +14,35 @@ export const metadata = {
   title: "Jobs · Air Production DB",
 };
 
+// Data MySQL dibaca saat runtime; tidak diprerender statis.
+export const dynamic = "force-dynamic";
+
 export default async function JobsPage() {
-  const [jobs, clients, vendors, venues] = await Promise.all([
+  const admin = await requireAuthenticatedAdmin();
+  const [jobs, clients, vendors, packages] = await Promise.all([
     getJobListItems(),
     getClients(),
     getVendors(),
-    getVenues(),
+    getPackages(true),
   ]);
 
   return (
+    <AppShell adminName={admin.name}>
     <div className="space-y-6">
       <PageHeader
         title="Jobs"
-        description="Kelola seluruh pekerjaan produksi dan dokumentasi Air Production."
+        description="Manage all Air Production production and documentation jobs."
       />
       <JobsTable
         jobs={jobs}
         clients={clients}
         vendors={vendors}
-        venues={venues}
+        packages={packages.map(({ id, name, description }) => ({ id, name, description }))}
         createAction={createJobAction}
         updateAction={updateJobAction}
         deleteAction={deleteJobAction}
       />
     </div>
+    </AppShell>
   );
 }

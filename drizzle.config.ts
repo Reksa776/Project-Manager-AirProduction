@@ -2,18 +2,18 @@ import { defineConfig } from "drizzle-kit";
 import { getDatabaseUrl } from "./src/db/env";
 
 /**
- * Konfigurasi Drizzle Kit (Phase 1 — MySQL Foundation).
+ * Konfigurasi Drizzle Kit untuk schema target Supabase PostgreSQL.
  *
  * - Kredensial diambil dari DATABASE_URL (env), tidak pernah di-hardcode
  *   dan tidak pernah dicetak ke output.
- * - `schema`  : barrel seluruh tabel MySQL (src/db/schema).
- * - `out`     : folder migration SQL yang di-commit ke git (reviewable).
- * - `dialect` : mysql (kompatibel dengan MariaDB 11.8 di environment ini).
+ * - `schema`  : barrel seluruh tabel PostgreSQL (src/db/schema).
+ * - `out`     : folder migrasi Supabase yang terpisah dari migrasi MySQL lama.
+ * - `dialect` : postgresql.
  */
 export default defineConfig({
   schema: "./src/db/schema/index.ts",
-  out: "./drizzle",
-  dialect: "mysql",
+  out: "./drizzle-supabase",
+  dialect: "postgresql",
   dbCredentials: {
     url: getDatabaseUrl(),
   },

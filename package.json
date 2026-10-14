@@ -11,10 +11,17 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:check": "drizzle-kit check"
+    "db:check": "drizzle-kit check",
+    "db:seed": "node scripts/db-seed.mjs",
+    "db:transfer": "node scripts/migrate-mysql-to-supabase.mjs",
+    "migration:snapshot": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/migration-ts-register.mjs src/migration-cli/cli.ts snapshot",
+    "migration:preflight": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/migration-ts-register.mjs src/migration-cli/cli.ts preflight",
+    "migration:rehearsal": "node --experimental-transform-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --import ./scripts/migration-ts-register.mjs scripts/p0e2a-rehearsal.mjs",
+    "migration:backup:local": "node --experimental-transform-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning --import ./scripts/migration-ts-register.mjs scripts/p0e2a1-local-backup.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
+    "dotenv": "^18.0.7",
     "drizzle-orm": "^0.45.3",
     "googleapis": "^183.0.0",
     "mysql2": "^3.24.5",

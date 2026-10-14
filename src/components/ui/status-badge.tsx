@@ -1,6 +1,6 @@
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { DELIVERY_STATUS_LABEL, JOB_STATUS_LABEL } from "@/lib/labels";
-import type { DeliveryStatus, JobStatus } from "@/lib/types";
+import type { DeliveryStatus, JobStatus } from "@/domain/types";
 
 /** Status Job dan Delivery memakai warna semantik yang tetap soft. */
 const jobStatusTone: Record<JobStatus, BadgeTone> = {

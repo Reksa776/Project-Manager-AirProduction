@@ -2,74 +2,73 @@
 
 import { revalidatePath } from "next/cache";
 
+import type { DeliveryStatus } from "@/domain/types";
+import { isDeliveryStatus } from "@/domain/validation";
 import {
   createDelivery,
   createJobCrew,
   deleteDelivery,
   deleteJobCrew,
+  recordCrewPayment,
   updateDelivery,
   updateJobCrew,
 } from "@/services/job-service";
-import { getRepositories } from "@/repositories";
-import type {
-  Delivery,
-  DeliveryStatus,
-  JobCrew,
-  PaymentStatus,
-} from "@/lib/types";
+import { parseAmountInput, parseQuantityInput } from "@/lib/utils";
+import { getApplication } from "@/services/runtime";
+import { assertAuthenticatedAdmin } from "@/lib/auth";
 
 export type JobDetailActionResult = { ok: true } | { ok: false; error: string };
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
-  return "Terjadi kesalahan yang tidak diketahui.";
+  return "An unexpected error occurred.";
 }
 
+/**
+ * Revalidasi path job memakai service kanonik (bukan repository legacy).
+ * `jobNumber` dibutuhkan untuk path dinamis `/jobs/[jobNumber]`.
+ */
 async function revalidateJob(jobId: string): Promise<void> {
   revalidatePath("/jobs");
   revalidatePath("/dashboard");
-  const job = await getRepositories().jobs.getById(jobId);
+  revalidatePath("/finance");
+  const job = await getApplication().services.jobs.getJobById(jobId);
   if (job) revalidatePath(`/jobs/${job.jobNumber}`);
 }
 
-const DELIVERY_STATUS_VALUES: DeliveryStatus[] = ["NOT_STARTED", "IN_PROGRESS", "COMPLETED"];
-const PAYMENT_STATUS_VALUES: PaymentStatus[] = ["UNPAID", "PARTIAL", "PAID"];
-
-function parseDeliveryType(value: string): string | undefined {
-  const trimmed = value.trim();
-  return trimmed ? trimmed : undefined;
+function requireIdempotencyKey(values: Record<string, string>): string {
+  const key = values.idempotencyKey?.trim();
+  if (!key) throw new Error("An idempotency key is required to record a cash movement.");
+  return key;
 }
 
-function parseOptionalNumber(value: string): number | undefined | null {
-  const trimmed = value.trim();
-  if (!trimmed) return undefined;
-  const n = Number(trimmed.replace(/\./g, "").replace(/,/g, ""));
-  return Number.isFinite(n) ? n : null;
-}
+/* ---- Crew assignment (obligation only: agreedAmount) ---- */
 
-/* ---- Crew assignment ---- */
+function parseRoleOverride(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
 
 export async function createJobCrewAction(
   jobId: string,
   values: Record<string, string>,
 ): Promise<JobDetailActionResult> {
   try {
-    const payment = parseOptionalNumber(values.actualPayment);
-    if (payment === null || payment === undefined) {
-      return { ok: false, error: "Payment crew harus angka valid." };
+    await assertAuthenticatedAdmin();
+    const agreedAmount = parseAmountInput(values.agreedAmount);
+    if (agreedAmount === null) {
+      return { ok: false, error: "Nilai kesepakatan crew harus angka valid." };
     }
-    const paymentStatus = values.paymentStatus?.trim();
-    if (paymentStatus && !PAYMENT_STATUS_VALUES.includes(paymentStatus as PaymentStatus)) {
-      return { ok: false, error: "Payment status crew tidak valid." };
-    }
-    const input: Omit<JobCrew, "id"> = {
+    const crewId = values.crewId?.trim();
+    if (!crewId) return { ok: false, error: "Please select a crew member." };
+
+    await createJobCrew({
       jobId,
-      crewId: values.crewId ?? "",
-      role: values.role ?? "",
-      actualPayment: payment,
-      paymentStatus: paymentStatus ? (paymentStatus as PaymentStatus) : undefined,
-    };
-    await createJobCrew(input);
+      crewId,
+      crewRoleId: parseRoleOverride(values.crewRoleId),
+      agreedAmount,
+      notes: values.notes?.trim() || undefined,
+    });
     await revalidateJob(jobId);
     return { ok: true };
   } catch (error) {
@@ -83,22 +82,21 @@ export async function updateJobCrewAction(
   values: Record<string, string>,
 ): Promise<JobDetailActionResult> {
   try {
-    const payment = parseOptionalNumber(values.actualPayment);
-    if (payment === null || payment === undefined) {
-      return { ok: false, error: "Payment crew harus angka valid." };
+    await assertAuthenticatedAdmin();
+    const agreedAmount = parseAmountInput(values.agreedAmount);
+    if (agreedAmount === null) {
+      return { ok: false, error: "Nilai kesepakatan crew harus angka valid." };
     }
-    const paymentStatus = values.paymentStatus?.trim();
-    if (paymentStatus && !PAYMENT_STATUS_VALUES.includes(paymentStatus as PaymentStatus)) {
-      return { ok: false, error: "Payment status crew tidak valid." };
-    }
-    const input: Omit<JobCrew, "id"> = {
+    const crewId = values.crewId?.trim();
+    if (!crewId) return { ok: false, error: "Please select a crew member." };
+
+    await updateJobCrew(id, {
       jobId,
-      crewId: values.crewId ?? "",
-      role: values.role ?? "",
-      actualPayment: payment,
-      paymentStatus: paymentStatus ? (paymentStatus as PaymentStatus) : undefined,
-    };
-    await updateJobCrew(id, input);
+      crewId,
+      crewRoleId: parseRoleOverride(values.crewRoleId),
+      agreedAmount,
+      notes: values.notes?.trim() || undefined,
+    });
     await revalidateJob(jobId);
     return { ok: true };
   } catch (error) {
@@ -106,9 +104,40 @@ export async function updateJobCrewAction(
   }
 }
 
-export async function deleteJobCrewAction(id: string, jobId: string): Promise<JobDetailActionResult> {
+export async function deleteJobCrewAction(
+  id: string,
+  jobId: string,
+): Promise<JobDetailActionResult> {
   try {
+    await assertAuthenticatedAdmin();
     await deleteJobCrew(id);
+    await revalidateJob(jobId);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
+}
+
+/** Catat KAS pembayaran crew (obligasi tidak berubah). */
+export async function recordCrewPaymentAction(
+  assignmentId: string,
+  jobId: string,
+  values: Record<string, string>,
+): Promise<JobDetailActionResult> {
+  try {
+    await assertAuthenticatedAdmin();
+    const amount = parseAmountInput(values.amount);
+    if (amount === null) return { ok: false, error: "Amount must be a valid number greater than zero." };
+    const occurredOn = values.occurredOn?.trim();
+    if (!occurredOn) return { ok: false, error: "Payment date is required." };
+
+    await recordCrewPayment({
+      assignmentId,
+      amount,
+      occurredOn,
+      description: values.description?.trim() || undefined,
+      idempotencyKey: requireIdempotencyKey(values),
+    });
     await revalidateJob(jobId);
     return { ok: true };
   } catch (error) {
@@ -118,30 +147,41 @@ export async function deleteJobCrewAction(id: string, jobId: string): Promise<Jo
 
 /* ---- Delivery ---- */
 
+function deliveryInputFrom(jobId: string, values: Record<string, string>) {
+  const status = (values.status as DeliveryStatus) ?? "NOT_STARTED";
+  if (!isDeliveryStatus(status)) throw new Error("Invalid deliverable status.");
+  const name = values.name?.trim();
+  if (!name) throw new Error("Deliverable name is required diisi.");
+  const deadline = values.deadline?.trim();
+  if (!deadline) throw new Error("Deliverable deadline is required.");
+
+  const quantityRaw = values.quantity?.trim();
+  let quantity: number | undefined;
+  if (quantityRaw) {
+    const parsed = parseQuantityInput(quantityRaw);
+    if (parsed === null) throw new Error("Quantity harus bilangan bulat >= 0.");
+    quantity = parsed;
+  }
+
+  return {
+    jobId,
+    name,
+    deliveryType: values.deliveryType?.trim() || undefined,
+    quantity,
+    deadline,
+    status,
+    deliveredAt: values.deliveredAt?.trim() || undefined,
+    notes: values.notes?.trim() || undefined,
+  };
+}
+
 export async function createDeliveryAction(
   jobId: string,
   values: Record<string, string>,
 ): Promise<JobDetailActionResult> {
   try {
-    if (values.status && !DELIVERY_STATUS_VALUES.includes(values.status as DeliveryStatus)) {
-      return { ok: false, error: "Status delivery tidak valid." };
-    }
-    const quantity = values.quantity?.trim()
-      ? parseOptionalNumber(values.quantity)
-      : undefined;
-    if (quantity === null) {
-      return { ok: false, error: "Quantity harus angka valid." };
-    }
-    const input: Omit<Delivery, "id"> = {
-      jobId,
-      name: values.name ?? "",
-      deliveryType: parseDeliveryType(values.deliveryType ?? ""),
-      quantity: quantity === undefined ? undefined : quantity,
-      deadline: values.deadline ?? "",
-      status: (values.status as DeliveryStatus) ?? "NOT_STARTED",
-      notes: values.notes?.trim() || undefined,
-    };
-    await createDelivery(input);
+    await assertAuthenticatedAdmin();
+    await createDelivery(deliveryInputFrom(jobId, values));
     await revalidateJob(jobId);
     return { ok: true };
   } catch (error) {
@@ -155,25 +195,8 @@ export async function updateDeliveryAction(
   values: Record<string, string>,
 ): Promise<JobDetailActionResult> {
   try {
-    if (values.status && !DELIVERY_STATUS_VALUES.includes(values.status as DeliveryStatus)) {
-      return { ok: false, error: "Status delivery tidak valid." };
-    }
-    const quantity = values.quantity?.trim()
-      ? parseOptionalNumber(values.quantity)
-      : undefined;
-    if (quantity === null) {
-      return { ok: false, error: "Quantity harus angka valid." };
-    }
-    const input: Omit<Delivery, "id"> = {
-      jobId,
-      name: values.name ?? "",
-      deliveryType: parseDeliveryType(values.deliveryType ?? ""),
-      quantity: quantity === undefined ? undefined : quantity,
-      deadline: values.deadline ?? "",
-      status: (values.status as DeliveryStatus) ?? "NOT_STARTED",
-      notes: values.notes?.trim() || undefined,
-    };
-    await updateDelivery(id, input);
+    await assertAuthenticatedAdmin();
+    await updateDelivery(id, deliveryInputFrom(jobId, values));
     await revalidateJob(jobId);
     return { ok: true };
   } catch (error) {
@@ -181,8 +204,12 @@ export async function updateDeliveryAction(
   }
 }
 
-export async function deleteDeliveryAction(id: string, jobId: string): Promise<JobDetailActionResult> {
+export async function deleteDeliveryAction(
+  id: string,
+  jobId: string,
+): Promise<JobDetailActionResult> {
   try {
+    await assertAuthenticatedAdmin();
     await deleteDelivery(id);
     await revalidateJob(jobId);
     return { ok: true };

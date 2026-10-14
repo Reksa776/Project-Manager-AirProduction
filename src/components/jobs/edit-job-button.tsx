@@ -11,7 +11,7 @@ import {
   Select,
 } from "@/components/ui";
 import { JOB_CATEGORY_LABEL, JOB_STATUS_LABEL } from "@/lib/labels";
-import type { Job } from "@/lib/types";
+import type { Job } from "@/domain/types";
 
 const CATEGORY_OPTIONS = [
   { value: "WEDDING", label: JOB_CATEGORY_LABEL.WEDDING },
@@ -38,14 +38,12 @@ export function EditJobButton({
   counterpartyId,
   clients,
   vendors,
-  venues,
 }: {
   job: Job;
-  counterpartyType: "CLIENT" | "VENDOR" | "UNKNOWN";
-  counterpartyId?: string;
+  counterpartyType: "CLIENT" | "VENDOR";
+  counterpartyId: string;
   clients: Array<{ id: string; name: string }>;
   vendors: Array<{ id: string; name: string }>;
-  venues: Array<{ id: string; name: string }>;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -59,9 +57,8 @@ export function EditJobButton({
       jobName: job.jobName,
       category: job.category,
       status: job.status,
-      counterpartyType: counterpartyType === "UNKNOWN" ? "CLIENT" : counterpartyType,
-      counterpartyId: counterpartyId ?? "",
-      venueId: job.venueId ?? "",
+      counterpartyType,
+      counterpartyId,
       executionDate: job.executionDate,
       location: job.location ?? "",
       notes: job.notes ?? "",
@@ -97,14 +94,14 @@ export function EditJobButton({
         open={open}
         onClose={() => setOpen(false)}
         title="Edit Job"
-        description="Job wajib memiliki Client ATAU Vendor (tidak keduanya)."
+        description="A job must be linked to either a client or a vendor, not both."
         footer={
           <>
             <Button variant="secondary" onClick={() => setOpen(false)} disabled={busy}>
-              Batal
+              Cancel
             </Button>
             <Button variant="primary" onClick={handleSubmit} disabled={busy}>
-              {busy ? "Menyimpan..." : "Simpan"}
+              {busy ? "Saving..." : "Save"}
             </Button>
           </>
         }
@@ -116,12 +113,12 @@ export function EditJobButton({
             </p>
           ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input label="Job Number" value={draft.jobNumber ?? ""} onChange={(e) => setDraft((p) => ({ ...p, jobNumber: e.target.value }))} />
+            <Input label="Job Number" value={draft.jobNumber ?? ""} readOnly />
             <Input label="Job Name" value={draft.jobName ?? ""} onChange={(e) => setDraft((p) => ({ ...p, jobName: e.target.value }))} />
-            <Select label="Kategori" options={CATEGORY_OPTIONS} value={draft.category ?? "WEDDING"} onChange={(e) => setDraft((p) => ({ ...p, category: e.target.value }))} />
+            <Select label="Category" options={CATEGORY_OPTIONS} value={draft.category ?? "WEDDING"} onChange={(e) => setDraft((p) => ({ ...p, category: e.target.value }))} />
             <Select label="Status" options={STATUS_FORM_OPTIONS} value={draft.status ?? "NOT_STARTED"} onChange={(e) => setDraft((p) => ({ ...p, status: e.target.value }))} />
             <Select
-              label="Jenis Counterparty"
+              label="Counterparty Type"
               options={COUNTERPARTY_TYPE_OPTIONS}
               value={draft.counterpartyType ?? "CLIENT"}
               onChange={(e) => setDraft((p) => ({ ...p, counterpartyType: e.target.value, counterpartyId: "" }))}
@@ -129,21 +126,15 @@ export function EditJobButton({
             <Select
               label={draft.counterpartyType === "VENDOR" ? "Vendor" : "Client"}
               options={counterpartyOptions}
-              placeholder="-- Pilih --"
+              placeholder="-- Select --"
               value={draft.counterpartyId ?? ""}
               onChange={(e) => setDraft((p) => ({ ...p, counterpartyId: e.target.value }))}
             />
-            <Select
-              label="Venue (opsional)"
-              options={[{ value: "", label: "-- Tanpa Venue --" }, ...venues.map((v) => ({ value: v.id, label: v.name }))]}
-              value={draft.venueId ?? ""}
-              onChange={(e) => setDraft((p) => ({ ...p, venueId: e.target.value }))}
-            />
-            <Input label="Tanggal Eksekusi (YYYY-MM-DD)" value={draft.executionDate ?? ""} onChange={(e) => setDraft((p) => ({ ...p, executionDate: e.target.value }))} />
-            <Input label="Lokasi" value={draft.location ?? ""} onChange={(e) => setDraft((p) => ({ ...p, location: e.target.value }))} />
+            <Input label="Event Date" type="date" value={draft.executionDate ?? ""} onChange={(e) => setDraft((p) => ({ ...p, executionDate: e.target.value }))} />
+            <Input label="Location" value={draft.location ?? ""} onChange={(e) => setDraft((p) => ({ ...p, location: e.target.value }))} />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-[13px] font-medium text-ink-soft">Catatan</label>
+            <label className="text-[13px] font-medium text-ink-soft">Notes</label>
             <textarea
               className="min-h-20 w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink focus:border-ink-muted focus:outline-none focus:ring-2 focus:ring-ink/5"
               value={draft.notes ?? ""}

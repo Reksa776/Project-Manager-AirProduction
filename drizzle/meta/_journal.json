@@ -8,6 +8,27 @@
       "when": 1791388670354,
       "tag": "0000_magical_true_believers",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1791909151929,
+      "tag": "0001_dizzy_sunspot",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1791998387553,
+      "tag": "0002_client_package_catalog",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1791998887345,
+      "tag": "0003_move_package_from_client_to_job",
+      "breakpoints": true
     }
   ]
 }

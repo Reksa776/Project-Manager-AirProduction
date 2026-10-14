@@ -1,4 +1,5 @@
-import { getRepositories } from "@/repositories";
+import type { Job } from "@/domain/types";
+import { getApplication } from "@/services/runtime";
 import { buildLookup, resolveCounterparty } from "@/services/shared";
 import type {
   DashboardData,
@@ -7,6 +8,18 @@ import type {
   IncomingWeddingItem,
 } from "@/services/types";
 
+/**
+ * Data Dashboard KANONIK (Contract v2).
+ *
+ * - `incomingWeddings` diturunkan dari `jobs.executionDate` (kategori WEDDING
+ *   yang belum lewat), diurutkan dari tanggal terdekat.
+ * - `incomingEditing` diturunkan dari `deliveries.deadline` (belum selesai).
+ * - Venue TIDAK dibaca (venue bukan entity aktif; hanya `legacyVenueName`
+ *   ditampilkan sebagai snapshot histori bila ada).
+ * - Database kosong menghasilkan ringkasan nol dan daftar kosong (bukan data
+ *   karangan).
+ */
+
 function today(): string {
   const now = new Date();
   const month = `${now.getMonth() + 1}`.padStart(2, "0");
@@ -14,27 +27,17 @@ function today(): string {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
-/**
- * Data untuk halaman Dashboard.
- *
- * - `incomingWeddings` diturunkan dari `jobs.executionDate` (job Wedding yang
- *   belum lewat), diurutkan dari tanggal terdekat.
- * - `incomingEditing` diturunkan dari `deliveries.deadline` (delivery yang belum
- *   selesai), diurutkan dari deadline terdekat.
- */
 export async function getDashboardData(): Promise<DashboardData> {
-  const repos = getRepositories();
-  const [jobs, clients, vendors, venues, deliveries] = await Promise.all([
-    repos.jobs.getAll(),
-    repos.clients.getAll(),
-    repos.vendors.getAll(),
-    repos.venues.getAll(),
-    repos.deliveries.getAll(),
+  const app = getApplication();
+  const [jobs, clients, vendors, deliveries] = await Promise.all([
+    app.services.jobs.listJobs(),
+    app.services.master.listClients(),
+    app.services.master.listVendors(),
+    app.services.deliveries.listDeliveries(),
   ]);
 
   const clientMap = buildLookup(clients);
   const vendorMap = buildLookup(vendors);
-  const venueMap = buildLookup(venues);
   const jobMap = buildLookup(jobs);
 
   const summary: DashboardSummary = {
@@ -45,17 +48,17 @@ export async function getDashboardData(): Promise<DashboardData> {
   };
 
   const startOfToday = today();
+  const counterpartyName = (job: Job): string =>
+    resolveCounterparty(job, clientMap, vendorMap)?.name ?? "-";
+
   const incomingWeddings: IncomingWeddingItem[] = jobs
-    .filter(
-      (job) =>
-        job.category === "WEDDING" && job.executionDate >= startOfToday,
-    )
+    .filter((job) => job.category === "WEDDING" && job.executionDate >= startOfToday)
     .sort((a, b) => a.executionDate.localeCompare(b.executionDate))
     .map((job) => ({
       jobNumber: job.jobNumber,
       jobName: job.jobName,
-      counterpartyName: resolveCounterparty(job, clientMap, vendorMap).name,
-      venueName: job.venueId ? venueMap.get(job.venueId)?.name : undefined,
+      counterpartyName: counterpartyName(job),
+      legacyVenueName: job.legacyVenueName,
       executionDate: job.executionDate,
       status: job.status,
     }));

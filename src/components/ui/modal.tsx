@@ -60,12 +60,12 @@ export function Modal({
         aria-modal="true"
         aria-label={title}
         className={cn(
-          "w-full rounded-xl border border-line bg-panel shadow-lg",
+          "flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-lg",
           sizeClasses[size],
         )}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-4 py-4 sm:px-6 sm:py-5">
           <div className="space-y-1">
             <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-ink">
               {title}
@@ -84,10 +84,10 @@ export function Modal({
           </button>
         </div>
 
-        {children ? <div className="px-6 py-5">{children}</div> : null}
+        {children ? <div className="min-h-0 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">{children}</div> : null}
 
         {footer ? (
-          <div className="flex justify-end gap-2 border-t border-line px-6 py-4">
+          <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-line px-4 py-4 sm:px-6">
             {footer}
           </div>
         ) : null}

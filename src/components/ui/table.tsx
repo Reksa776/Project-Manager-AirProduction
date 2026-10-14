@@ -12,7 +12,12 @@ export function Table({
   ...props
 }: TableHTMLAttributes<HTMLTableElement>) {
   return (
-    <div className="w-full overflow-x-auto">
+    <div
+      className="w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain"
+      role="region"
+      aria-label="Table, scroll horizontally to view more columns"
+      tabIndex={0}
+    >
       <table
         className={cn("w-full border-collapse text-sm", className)}
         {...props}

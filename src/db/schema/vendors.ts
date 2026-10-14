@@ -1,8 +1,8 @@
 import { pgTable, text, varchar } from "drizzle-orm/pg-core";
 
-/**
- * vendors — master vendor (counterparty job).
- */
+import { timestamps } from "./_shared";
+
+/** vendors — master vendor (tanpa venue, tanpa perubahan lain). */
 export const vendors = pgTable("vendors", {
   id: varchar("id", { length: 36 }).primaryKey(),
   name: varchar("name", { length: 120 }).notNull(),

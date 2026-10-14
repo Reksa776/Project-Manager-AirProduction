@@ -2,175 +2,217 @@
 
 import { revalidatePath } from "next/cache";
 
+import type { ClientPaymentTerm, VendorPaymentType } from "@/domain/types";
+import { isClientPaymentTerm, isVendorPaymentType } from "@/domain/validation";
+import { parseAmountInput } from "@/lib/utils";
 import {
-  createClientPayment,
-  createExpense,
-  createVendorPayment,
-  deleteClientPayment,
-  deleteExpense,
-  deleteVendorPayment,
-  updateClientPayment,
-  updateExpense,
-  updateVendorPayment,
+  createClientSchedule,
+  createVendorSchedule,
+  recordClientPayment,
+  recordExpense,
+  recordVendorPayment,
+  updateClientSchedule,
+  updateVendorSchedule,
 } from "@/services/job-service";
-import type {
-  ClientPaymentTerm,
-  PaymentStatus,
-  VendorPaymentType,
-} from "@/lib/types";
-import { EXPENSE_CATEGORIES } from "@/lib/labels";
+import { getApplication } from "@/services/runtime";
+import { assertAuthenticatedAdmin } from "@/lib/auth";
 
 export type FinanceActionResult = { ok: true } | { ok: false; error: string };
 
+const GENERAL_EXPENSE_CATEGORIES = ["TRANSPORT", "EQUIPMENT", "OTHER"] as const;
+type GeneralExpenseCategory = (typeof GENERAL_EXPENSE_CATEGORIES)[number];
+
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
-  return "Terjadi kesalahan yang tidak diketahui.";
+  return "An unexpected error occurred.";
 }
 
-async function run(action: () => Promise<unknown>): Promise<FinanceActionResult> {
+async function revalidateFinance(jobId?: string): Promise<void> {
+  revalidatePath("/finance");
+  revalidatePath("/jobs");
+  revalidatePath("/dashboard");
+  if (jobId) {
+    const job = await getApplication().services.jobs.getJobById(jobId);
+    if (job) revalidatePath(`/jobs/${job.jobNumber}`);
+  }
+}
+
+async function run(
+  action: () => Promise<string | undefined>,
+): Promise<FinanceActionResult> {
   try {
-    await action();
-    revalidatePath("/finance");
-    revalidatePath("/jobs");
+    await assertAuthenticatedAdmin();
+    const jobId = await action();
+    await revalidateFinance(jobId);
     return { ok: true };
   } catch (error) {
     return { ok: false, error: errorMessage(error) };
   }
 }
 
-const TERM_OPTIONS: ClientPaymentTerm[] = ["TERMIN_1", "TERMIN_2", "TERMIN_3"];
-const TYPE_OPTIONS: VendorPaymentType[] = ["DP", "PELUNASAN"];
-const STATUS_OPTIONS: PaymentStatus[] = ["UNPAID", "PARTIAL", "PAID"];
-const EXPENSE_CATEGORY_OPTIONS: readonly string[] = EXPENSE_CATEGORIES;
-
-function parseAmount(raw: string | undefined): number {
-  if (!raw || !raw.trim()) return NaN;
-  return Number(raw.replace(/\./g, "").replace(/,/g, "").trim());
+function requireAmount(values: Record<string, string>, label: string): string {
+  const amount = parseAmountInput(values.amount);
+  if (amount === null) throw new Error(`${label} harus angka valid (> 0).`);
+  return amount;
 }
 
-/* Client payments */
-export async function createClientPaymentAction(values: Record<string, string>): Promise<FinanceActionResult> {
-  const term = values.term as ClientPaymentTerm;
-  const status = values.status as PaymentStatus;
-  const amount = parseAmount(values.amount);
-  if (!values.jobId?.trim()) return { ok: false, error: "Job wajib dipilih." };
-  if (!TERM_OPTIONS.includes(term)) return { ok: false, error: "Termin tidak valid." };
-  if (!STATUS_OPTIONS.includes(status)) return { ok: false, error: "Status pembayaran tidak valid." };
-  if (!Number.isFinite(amount)) return { ok: false, error: "Amount harus angka valid." };
-  return run(() =>
-    createClientPayment({
-      jobId: values.jobId, term, amount,
+function requireDate(values: Record<string, string>, key: string, label: string): string {
+  const value = values[key]?.trim();
+  if (!value) throw new Error(`${label} is required diisi.`);
+  return value;
+}
+
+function requireIdempotencyKey(values: Record<string, string>): string {
+  const key = values.idempotencyKey?.trim();
+  if (!key) throw new Error("An idempotency key is required to record a cash movement.");
+  return key;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Payment schedules (OBLIGATIONS — no cash movement, no stored status)       */
+/* -------------------------------------------------------------------------- */
+
+export async function createClientScheduleAction(
+  values: Record<string, string>,
+): Promise<FinanceActionResult> {
+  return run(async () => {
+    const jobId = values.jobId?.trim();
+    if (!jobId) throw new Error("Please select a job.");
+    const term = values.term?.trim() as ClientPaymentTerm;
+    if (!isClientPaymentTerm(term)) throw new Error("Invalid installment.");
+    await createClientSchedule({
+      jobId,
+      term,
+      amount: requireAmount(values, "Amount"),
       dueDate: values.dueDate?.trim() || undefined,
-      paidDate: values.paidDate?.trim() || undefined,
-      status, notes: values.notes?.trim() || undefined,
-    }),
-  );
-}
-
-export async function updateClientPaymentAction(id: string, values: Record<string, string>): Promise<FinanceActionResult> {
-  const term = values.term as ClientPaymentTerm;
-  const status = values.status as PaymentStatus;
-  const amount = parseAmount(values.amount);
-  if (!values.jobId?.trim()) return { ok: false, error: "Job wajib dipilih." };
-  if (!TERM_OPTIONS.includes(term)) return { ok: false, error: "Termin tidak valid." };
-  if (!STATUS_OPTIONS.includes(status)) return { ok: false, error: "Status pembayaran tidak valid." };
-  if (!Number.isFinite(amount)) return { ok: false, error: "Amount harus angka valid." };
-  return run(() =>
-    updateClientPayment(id, {
-      jobId: values.jobId, term, amount,
-      dueDate: values.dueDate?.trim() || undefined,
-      paidDate: values.paidDate?.trim() || undefined,
-      status, notes: values.notes?.trim() || undefined,
-    }),
-  );
-}
-
-export async function deleteClientPaymentAction(id: string): Promise<FinanceActionResult> {
-  return run(() => deleteClientPayment(id));
-}
-
-/* Vendor payments */
-export async function createVendorPaymentAction(values: Record<string, string>): Promise<FinanceActionResult> {
-  const type = values.type as VendorPaymentType;
-  const status = values.status as PaymentStatus;
-  const amount = parseAmount(values.amount);
-  if (!values.jobId?.trim()) return { ok: false, error: "Job wajib dipilih." };
-  if (!TYPE_OPTIONS.includes(type)) return { ok: false, error: "Tipe pembayaran vendor tidak valid." };
-  if (!STATUS_OPTIONS.includes(status)) return { ok: false, error: "Status pembayaran tidak valid." };
-  if (!Number.isFinite(amount)) return { ok: false, error: "Amount harus angka valid." };
-  return run(() =>
-    createVendorPayment({
-      jobId: values.jobId, type, amount,
-      dueDate: values.dueDate?.trim() || undefined,
-      paidDate: values.paidDate?.trim() || undefined,
-      status, notes: values.notes?.trim() || undefined,
-    }),
-  );
-}
-
-export async function updateVendorPaymentAction(id: string, values: Record<string, string>): Promise<FinanceActionResult> {
-  const type = values.type as VendorPaymentType;
-  const status = values.status as PaymentStatus;
-  const amount = parseAmount(values.amount);
-  if (!values.jobId?.trim()) return { ok: false, error: "Job wajib dipilih." };
-  if (!TYPE_OPTIONS.includes(type)) return { ok: false, error: "Tipe pembayaran vendor tidak valid." };
-  if (!STATUS_OPTIONS.includes(status)) return { ok: false, error: "Status pembayaran tidak valid." };
-  if (!Number.isFinite(amount)) return { ok: false, error: "Amount harus angka valid." };
-  return run(() =>
-    updateVendorPayment(id, {
-      jobId: values.jobId, type, amount,
-      dueDate: values.dueDate?.trim() || undefined,
-      paidDate: values.paidDate?.trim() || undefined,
-      status, notes: values.notes?.trim() || undefined,
-    }),
-  );
-}
-
-export async function deleteVendorPaymentAction(id: string): Promise<FinanceActionResult> {
-  return run(() => deleteVendorPayment(id));
-}
-
-/* Expense */
-export async function createExpenseAction(values: Record<string, string>): Promise<FinanceActionResult> {
-  const amount = parseAmount(values.amount);
-  if (!values.jobId?.trim()) return { ok: false, error: "Job wajib dipilih." };
-  if (!values.category?.trim()) return { ok: false, error: "Kategori wajib diisi." };
-  if (!EXPENSE_CATEGORY_OPTIONS.includes(values.category)) return { ok: false, error: "Kategori expense tidak valid." };
-  if (!values.description?.trim()) return { ok: false, error: "Deskripsi wajib diisi." };
-  if (!values.date?.trim()) return { ok: false, error: "Tanggal expense wajib diisi." };
-  if (!Number.isFinite(amount)) return { ok: false, error: "Amount harus angka valid." };
-  return run(() =>
-    createExpense({
-      jobId: values.jobId,
-      category: values.category,
-      description: values.description,
-      amount,
-      date: values.date,
       notes: values.notes?.trim() || undefined,
-    }),
-  );
+    });
+    return jobId;
+  });
 }
 
-export async function updateExpenseAction(id: string, values: Record<string, string>): Promise<FinanceActionResult> {
-  const amount = parseAmount(values.amount);
-  if (!values.jobId?.trim()) return { ok: false, error: "Job wajib dipilih." };
-  if (!values.category?.trim()) return { ok: false, error: "Kategori wajib diisi." };
-  if (!EXPENSE_CATEGORY_OPTIONS.includes(values.category)) return { ok: false, error: "Kategori expense tidak valid." };
-  if (!values.description?.trim()) return { ok: false, error: "Deskripsi wajib diisi." };
-  if (!values.date?.trim()) return { ok: false, error: "Tanggal expense wajib diisi." };
-  if (!Number.isFinite(amount)) return { ok: false, error: "Amount harus angka valid." };
-  return run(() =>
-    updateExpense(id, {
-      jobId: values.jobId,
-      category: values.category,
-      description: values.description,
-      amount,
-      date: values.date,
+export async function updateClientScheduleAction(
+  id: string,
+  values: Record<string, string>,
+): Promise<FinanceActionResult> {
+  return run(async () => {
+    const jobId = values.jobId?.trim();
+    if (!jobId) throw new Error("Please select a job.");
+    const term = values.term?.trim() as ClientPaymentTerm;
+    if (!isClientPaymentTerm(term)) throw new Error("Invalid installment.");
+    await updateClientSchedule(id, {
+      jobId,
+      term,
+      amount: requireAmount(values, "Amount"),
+      dueDate: values.dueDate?.trim() || undefined,
       notes: values.notes?.trim() || undefined,
-    }),
-  );
+    });
+    return jobId;
+  });
 }
 
-export async function deleteExpenseAction(id: string): Promise<FinanceActionResult> {
-  return run(() => deleteExpense(id));
+export async function createVendorScheduleAction(
+  values: Record<string, string>,
+): Promise<FinanceActionResult> {
+  return run(async () => {
+    const jobId = values.jobId?.trim();
+    if (!jobId) throw new Error("Please select a job.");
+    const type = values.type?.trim() as VendorPaymentType;
+    if (!isVendorPaymentType(type)) throw new Error("Invalid vendor payment type.");
+    await createVendorSchedule({
+      jobId,
+      type,
+      amount: requireAmount(values, "Amount"),
+      dueDate: values.dueDate?.trim() || undefined,
+      notes: values.notes?.trim() || undefined,
+    });
+    return jobId;
+  });
+}
+
+export async function updateVendorScheduleAction(
+  id: string,
+  values: Record<string, string>,
+): Promise<FinanceActionResult> {
+  return run(async () => {
+    const jobId = values.jobId?.trim();
+    if (!jobId) throw new Error("Please select a job.");
+    const type = values.type?.trim() as VendorPaymentType;
+    if (!isVendorPaymentType(type)) throw new Error("Invalid vendor payment type.");
+    await updateVendorSchedule(id, {
+      jobId,
+      type,
+      amount: requireAmount(values, "Amount"),
+      dueDate: values.dueDate?.trim() || undefined,
+      notes: values.notes?.trim() || undefined,
+    });
+    return jobId;
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* ACTUAL CASH (canonical cashflows; idempotent, atomic)                      */
+/* -------------------------------------------------------------------------- */
+
+export async function recordClientPaymentAction(
+  values: Record<string, string>,
+): Promise<FinanceActionResult> {
+  return run(async () => {
+    const scheduleId = values.scheduleId?.trim();
+    if (!scheduleId) throw new Error("Please select a client payment schedule.");
+    await recordClientPayment({
+      scheduleId,
+      amount: requireAmount(values, "Amount"),
+      occurredOn: requireDate(values, "occurredOn", "Payment date"),
+      description: values.description?.trim() || undefined,
+      idempotencyKey: requireIdempotencyKey(values),
+    });
+    const schedule = await getApplication().repositories.clientPaymentSchedules.getById(scheduleId);
+    return schedule?.jobId;
+  });
+}
+
+export async function recordVendorPaymentAction(
+  values: Record<string, string>,
+): Promise<FinanceActionResult> {
+  return run(async () => {
+    const scheduleId = values.scheduleId?.trim();
+    if (!scheduleId) throw new Error("Please select a vendor payment schedule.");
+    await recordVendorPayment({
+      scheduleId,
+      amount: requireAmount(values, "Amount"),
+      occurredOn: requireDate(values, "occurredOn", "Payment date"),
+      description: values.description?.trim() || undefined,
+      idempotencyKey: requireIdempotencyKey(values),
+    });
+    const schedule = await getApplication().repositories.vendorPaymentSchedules.getById(scheduleId);
+    return schedule?.jobId;
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* General operational expenses (canonical cashflow, job optional)            */
+/* -------------------------------------------------------------------------- */
+
+export async function recordExpenseAction(
+  values: Record<string, string>,
+): Promise<FinanceActionResult> {
+  return run(async () => {
+    const category = values.category?.trim() as GeneralExpenseCategory;
+    if (!GENERAL_EXPENSE_CATEGORIES.includes(category)) {
+      throw new Error("Invalid expense category (TRANSPORT, EQUIPMENT, OTHER).");
+    }
+    const description = values.description?.trim();
+    if (!description) throw new Error("Description biaya is required diisi.");
+    const jobId = values.jobId?.trim() || undefined;
+    await recordExpense({
+      jobId,
+      category,
+      amount: requireAmount(values, "Amount"),
+      occurredOn: requireDate(values, "occurredOn", "Expense date"),
+      description,
+      idempotencyKey: requireIdempotencyKey(values),
+    });
+    return jobId;
+  });
 }

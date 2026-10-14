@@ -1,19 +1,25 @@
-import type { Client, Job, Vendor } from "@/lib/types";
-import type { Counterparty } from "@/services/types";
+import type { Client, Job, Vendor } from "@/domain/types";
+
+/**
+ * Helper komposisi bersama (domain kanonik saja).
+ * Tidak ada impor ke kontrak legacy, Google Sheets, maupun `@/lib/types`.
+ */
 
 export function buildLookup<T extends { id: string }>(items: T[]): Map<string, T> {
   return new Map(items.map((item) => [item.id, item]));
 }
 
 /**
- * Menentukan counterparty sebuah Job berdasarkan aturan:
- * Job wajib memiliki Client ATAU Vendor (tidak keduanya).
+ * Counterparty sebuah Job secara kanonik.
+ * Selaras dengan invariant XOR: Job wajib memiliki Client ATAU Vendor, dan
+ * `CanonicalJobRepository` menolak job yang melanggar aturan ini — sehingga
+ * `null` di sini berarti data rusak dan dilaporkan eksplisit (bukan ditebak).
  */
 export function resolveCounterparty(
   job: Job,
   clients: Map<string, Client>,
   vendors: Map<string, Vendor>,
-): Counterparty {
+): { type: "CLIENT" | "VENDOR"; id: string; name: string } | null {
   if (job.clientId) {
     return {
       type: "CLIENT",
@@ -22,12 +28,12 @@ export function resolveCounterparty(
     };
   }
   if (job.vendorId) {
+    const vendor = vendors.get(job.vendorId);
     return {
       type: "VENDOR",
       id: job.vendorId,
-      name: vendors.get(job.vendorId)?.name ?? "Vendor tidak dikenal",
+      name: vendor?.name ?? "Vendor tidak dikenal",
     };
   }
-  // Tidak seharusnya terjadi bila business rule dipatuhi.
-  return { type: "UNKNOWN", name: "Tanpa Client/Vendor" };
+  return null;
 }

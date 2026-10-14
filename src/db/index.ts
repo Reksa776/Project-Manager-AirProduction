@@ -1,10 +1,11 @@
-import { drizzle, type PgDatabase } from "drizzle-orm/postgres";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+
 import { getDatabaseUrl } from "./env";
 import * as schema from "./schema";
 
 /**
- * Koneksi database Phase 3 (PostgreSQL via Drizzle + pg pool).
+ * Koneksi database PostgreSQL (Supabase) via Drizzle + node-postgres pool.
  *
  * Aturan:
  * - Server-side only: getDb() menolak dipanggil dari browser bundle.
@@ -12,36 +13,32 @@ import * as schema from "./schema";
  *   aman terhadap hot-reload Next.js dev yang menggandakan module instance).
  * - Kredensial hanya dibaca dari DATABASE_URL (src/db/env.ts), tidak pernah
  *   di-hardcode ataupun dicetak.
- * - Timezone: setiap koneksi diset `time_zone = '+00:00'` sehingga seluruh
- *   DEFAULT/ON UPDATE CURRENT_TIMESTAMP(3) tersimpan dalam UTC (lihat _shared.ts).
+ * - Timestamp disimpan sebagai UTC; PostgreSQL mengelola timestamptz secara native.
+ * - Koneksi dibuat LAMBAT (lazy) saat getDb() pertama kali dipanggil, bukan
+ *   saat module di-import.
  */
 
-export type Database = PgDatabase<typeof schema>;
+export type Database = NodePgDatabase<typeof schema>;
 
-interface DbHandle {
+export interface DbHandle {
   pool: Pool;
   db: Database;
 }
 
 const globalRef = globalThis as unknown as { __airprodDbHandle?: DbHandle };
 
-function createHandle(url: string): DbHandle {
-  const pool = new Pool({
-    connectionString: url,
-    connectionLimit: 10,
-    max: 10,
-    idleTimeoutMillis: 30000,
-    commandTimeout: 30000,
-  });
-
-  // SET time_zone per koneksi → seluruh DEFAULT/ON UPDATE CURRENT_TIMESTAMP(3) = UTC.
-  pool.on("connect", (client) => {
-    client.query("SET time_zone = '+00:00'", (err) => {
-      if (err) console.warn("Gagal SET time_zone:", err);
-    });
-  });
-
-  const db = drizzle(pool, { schema, mode: "default" });
+/**
+ * Membuat SATU handle koneksi (PostgreSQL pool + Drizzle) dari connection string.
+ *
+ * Dipakai oleh `getDb()` (pool bersama runtime) dan oleh koneksi terisolasi
+ * eksplisit (`src/db/connection.ts`, mis. untuk test database). Sengaja TIDAK
+ * memakai `getDatabaseUrl()` agar pemanggil dapat menyuntikkan URL secara
+ * eksplisit tanpa mengubah environment. Tidak ada koneksi yang dibuka saat
+ * module ini di-import: pg pool bersifat lazy.
+ */
+export function createDatabaseHandle(url: string): DbHandle {
+  const pool = new Pool({ connectionString: url, max: 10, idleTimeoutMillis: 60_000 });
+  const db = drizzle(pool, { schema });
   return { pool, db };
 }
 
@@ -51,7 +48,7 @@ export function getDb(): Database {
     throw new Error("getDb() hanya dapat dipanggil di sisi server.");
   }
   if (!globalRef.__airprodDbHandle) {
-    globalRef.__airprodDbHandle = createHandle(getDatabaseUrl());
+    globalRef.__airprodDbHandle = createDatabaseHandle(getDatabaseUrl());
   }
   return globalRef.__airprodDbHandle.db;
 }

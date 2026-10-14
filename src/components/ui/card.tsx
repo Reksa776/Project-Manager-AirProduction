@@ -6,7 +6,7 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        "rounded-xl border border-line bg-panel shadow-sm",
+        "min-w-0 max-w-full rounded-2xl border border-line bg-panel shadow-[0_2px_12px_rgba(56,36,31,0.035)]",
         className,
       )}
       {...props}
@@ -28,7 +28,7 @@ export function CardHeader({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-start justify-between gap-4 border-b border-line px-6 py-5",
+        "flex flex-wrap items-start justify-between gap-4 border-b border-line px-5 py-5 sm:px-6",
         className,
       )}
     >

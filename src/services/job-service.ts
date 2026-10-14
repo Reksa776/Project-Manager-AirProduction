@@ -1,362 +1,420 @@
-import { getRepositories } from "@/repositories";
-import { buildLookup, resolveCounterparty } from "@/services/shared";
+import { derivePaymentStatus, deriveSettlement } from "@/domain/finance";
 import type {
+  CreateClientPaymentScheduleInput,
+  CreateDeliveryInput,
+  CreateJobCrewAssignmentInput,
+  CreateJobInput,
+  CreateVendorPaymentScheduleInput,
+} from "@/domain/inputs";
+import { sumAmounts, type Amount } from "@/domain/money";
+import type {
+  Cashflow,
+  CashflowCategory,
+  CashflowReferenceType,
+  Delivery,
+  Job,
+  JobCategory,
   JobCrewAssignment,
+  JobStatus,
+  ClientPaymentSchedule,
+  VendorPaymentSchedule,
+} from "@/domain/types";
+import { buildLookup, resolveCounterparty } from "@/services/shared";
+import { getApplication } from "@/services/runtime";
+import type {
+  CashflowRowView,
+  ClientScheduleView,
+  Counterparty,
+  CrewAssignmentView,
+  FinanceOverview,
   JobDetail,
   JobListItem,
+  JobFinancialTotals,
+  VendorScheduleView,
 } from "@/services/types";
-import type {
-  ClientPayment,
-  Delivery,
-  Expense,
-  Job,
-  JobCrew,
-  VendorPayment,
-} from "@/lib/types";
-import {
-  CLIENT_PAYMENT_TERM,
-  DELIVERY_STATUS,
-  JOB_CATEGORY,
-  JOB_STATUS,
-  PAYMENT_STATUS,
-  VENDOR_PAYMENT_TYPE,
-} from "@/lib/types";
 
 /**
- * Service untuk entity Job.
+ * Service Job & relasi KANONIK (Contract v2).
  *
- * Semua fungsi bersifat async agar implementasi Google Sheets dapat
- * ditukarkan tanpa mengubah komponen UI.
+ * - Job memakai invariant kanonik: client XOR vendor (divalidasi repository +
+ *   CHECK DB). `jobNumber` tetap input manual (generator otomatis = P2A).
+ * - Venue tidak ada di form; hanya `legacyVenueName` sebagai snapshot histori.
+ * - OBLIGASI (jadwal/`agreedAmount`) terpisah dari KAS (`cashflows`).
+ * - Status pembayaran SELALU diturunkan dari kas nyata (tidak pernah disimpan).
+ * - Semua tulis finansial lewat service finansial kanonik (atomic + idempotent).
  */
 
-/** Daftar Job dalam bentuk view model, diurutkan dari job terbaru. */
-export async function getJobListItems(): Promise<JobListItem[]> {
-  const repos = getRepositories();
-  const [jobs, clients, vendors, venues] = await Promise.all([
-    repos.jobs.getAll(),
-    repos.clients.getAll(),
-    repos.vendors.getAll(),
-    repos.venues.getAll(),
-  ]);
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
 
+function hasValue(value: string | undefined): value is string {
+  return value !== undefined && value !== "";
+}
+
+/** Total kas nyata untuk satu referensi dari daftar kas yang sudah dibaca. */
+function paidForReference(
+  cashflows: readonly Cashflow[],
+  referenceType: CashflowReferenceType,
+  referenceId: string,
+): Amount {
+  return sumAmounts(
+    cashflows
+      .filter(
+        (flow) => flow.referenceType === referenceType && flow.referenceId === referenceId,
+      )
+      .map((flow) => flow.amount),
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Reads                                                                      */
+/* -------------------------------------------------------------------------- */
+
+export async function getJobListItems(): Promise<JobListItem[]> {
+  const app = getApplication();
+  const [jobs, clients, vendors] = await Promise.all([
+    app.services.jobs.listJobs(),
+    app.services.master.listClients(),
+    app.services.master.listVendors(),
+  ]);
   const clientMap = buildLookup(clients);
   const vendorMap = buildLookup(vendors);
-  const venueMap = buildLookup(venues);
 
-  return jobs
-    .map<JobListItem>((job) => ({
+  const items: JobListItem[] = [];
+  for (const job of jobs) {
+    const counterparty: Counterparty | null = resolveCounterparty(job, clientMap, vendorMap);
+    if (!counterparty) continue;
+    items.push({
       id: job.id,
       jobNumber: job.jobNumber,
       jobName: job.jobName,
       category: job.category,
-      counterparty: resolveCounterparty(job, clientMap, vendorMap),
-      venueId: job.venueId,
-      venueName: job.venueId ? venueMap.get(job.venueId)?.name : undefined,
+      counterparty,
+      packageId: job.packageId,
+      legacyVenueName: job.legacyVenueName,
       executionDate: job.executionDate,
       status: job.status,
       location: job.location,
       notes: job.notes,
-    }))
-    .sort((a, b) => b.jobNumber.localeCompare(a.jobNumber));
+    });
+  }
+  return items.sort((a, b) => b.jobNumber.localeCompare(a.jobNumber));
 }
 
-/** Detail lengkap satu Job berdasarkan `jobNumber`. */
 export async function getJobDetail(jobNumber: string): Promise<JobDetail | null> {
-  const repos = getRepositories();
-  const job = await repos.jobs.getByJobNumber(jobNumber);
+  const app = getApplication();
+  const job = await app.services.jobs.getJobByNumber(jobNumber);
   if (!job) return null;
 
-  const [clients, vendors, venues, jobCrews, crew, deliveries, clientPayments, vendorPayments, expenses] =
+  const counterparty = await resolveJobCounterparty(job);
+
+  const [crewList, crewRoles, assignments, deliveries, clientSchedules, vendorSchedules, cashflows, totals] =
     await Promise.all([
-      repos.clients.getAll(),
-      repos.vendors.getAll(),
-      repos.venues.getAll(),
-      repos.jobCrews.getByJobId(job.id),
-      repos.crew.getAll(),
-      repos.deliveries.getByJobId(job.id),
-      repos.clientPayments.getByJobId(job.id),
-      repos.vendorPayments.getByJobId(job.id),
-      repos.expenses.getByJobId(job.id),
+      app.services.master.listCrew(),
+      app.services.master.listCrewRoles(),
+      app.repositories.jobCrewAssignments.getByJobId(job.id),
+      app.services.deliveries.listByJob(job.id),
+      app.repositories.clientPaymentSchedules.getByJobId(job.id),
+      app.repositories.vendorPaymentSchedules.getByJobId(job.id),
+      app.repositories.cashflows.getByJobId(job.id),
+      app.financial.getJobFinancialSummary(job.id),
     ]);
 
-  const crewMap = buildLookup(crew);
-  const assignments: JobCrewAssignment[] = jobCrews.map((assignment) => ({
-    assignment,
-    crew: crewMap.get(assignment.crewId) ?? null,
-  }));
+  const crewMap = buildLookup(crewList);
+  const roleMap = buildLookup(crewRoles);
+  const crewAssignments: CrewAssignmentView[] = assignments.map((assignment) => {
+    const crew = crewMap.get(assignment.crewId) ?? null;
+    const effectiveRoleId = assignment.crewRoleId ?? crew?.crewRoleId ?? null;
+    const settlement = deriveSettlement(assignment.agreedAmount, [
+      { amount: paidForReference(cashflows, "job_crew", assignment.id) },
+    ]);
+    return {
+      assignment,
+      crew,
+      roleName: effectiveRoleId ? (roleMap.get(effectiveRoleId)?.name ?? "-") : "-",
+      agreedAmount: settlement.obligationAmount,
+      paidAmount: settlement.paidAmount,
+      remainingAmount: settlement.remainingAmount,
+      status: settlement.status,
+    };
+  });
 
   return {
     job,
-    counterparty: resolveCounterparty(
-      job,
-      buildLookup(clients),
-      buildLookup(vendors),
-    ),
-    venue: job.venueId
-      ? (venues.find((venue) => venue.id === job.venueId) ?? null)
-      : null,
-    assignments,
-    deliveries: [...deliveries].sort((a, b) =>
-      a.deadline.localeCompare(b.deadline),
-    ),
-    clientPayments: [...clientPayments].sort((a, b) =>
-      a.term.localeCompare(b.term),
-    ),
-    vendorPayments: [...vendorPayments].sort((a, b) =>
-      a.type.localeCompare(b.type),
-    ),
-    expenses: [...expenses].sort((a, b) => a.date.localeCompare(b.date)),
+    counterparty,
+    crewAssignments,
+    deliveries: [...deliveries].sort((a, b) => a.deadline.localeCompare(b.deadline)),
+    clientSchedules: clientSchedules
+      .map((schedule) => toClientScheduleView(schedule, cashflows))
+      .sort((a, b) => a.term.localeCompare(b.term)),
+    vendorSchedules: vendorSchedules
+      .map((schedule) => toVendorScheduleView(schedule, cashflows))
+      .sort((a, b) => a.type.localeCompare(b.type)),
+    cashflows: [...cashflows].sort((a, b) => b.occurredOn.localeCompare(a.occurredOn)),
+    totals: toTotalsView(totals),
+  };
+}
+
+async function resolveJobCounterparty(job: Job): Promise<Counterparty> {
+  const app = getApplication();
+  if (job.clientId) {
+    const client = await app.services.master.getClient(job.clientId);
+    return { type: "CLIENT", id: job.clientId, name: client?.name ?? "Client tidak dikenal" };
+  }
+  if (job.vendorId) {
+    const vendor = await app.services.master.getVendor(job.vendorId);
+    return { type: "VENDOR", id: job.vendorId, name: vendor?.name ?? "Vendor tidak dikenal" };
+  }
+  throw new Error(
+    `Job '${job.jobNumber}' tidak memiliki client maupun vendor (melanggar aturan XOR).`,
+  );
+}
+
+function toClientScheduleView(
+  schedule: ClientPaymentSchedule,
+  cashflows: readonly Cashflow[],
+): ClientScheduleView {
+  const paidAmount = paidForReference(cashflows, "client_payment", schedule.id);
+  return { ...schedule, paidAmount, status: derivePaymentStatus(schedule.amount, paidAmount) };
+}
+
+function toVendorScheduleView(
+  schedule: VendorPaymentSchedule,
+  cashflows: readonly Cashflow[],
+): VendorScheduleView {
+  const paidAmount = paidForReference(cashflows, "vendor_payment", schedule.id);
+  return { ...schedule, paidAmount, status: derivePaymentStatus(schedule.amount, paidAmount) };
+}
+
+function toTotalsView(totals: JobFinancialTotals): JobFinancialTotals {
+  return totals;
+}
+
+/** Ringkasan finance (+ daftar kas) untuk halaman Finance. */
+export async function getFinanceOverview(): Promise<FinanceOverview> {
+  const app = getApplication();
+  const [jobs, clientSchedules, vendorSchedules, cashflows, totals] = await Promise.all([
+    app.services.jobs.listJobs(),
+    app.repositories.clientPaymentSchedules.getAll(),
+    app.repositories.vendorPaymentSchedules.getAll(),
+    app.repositories.cashflows.getAll(),
+    app.repositories.cashflows.totals({}),
+  ]);
+
+  const jobMap = buildLookup(jobs);
+  const jobLabel = (jobId: string | undefined): string => {
+    if (!hasValue(jobId)) return "-";
+    const job = jobMap.get(jobId);
+    return job ? `${job.jobNumber} — ${job.jobName}` : "-";
+  };
+  const jobNumber = (jobId: string): string => jobMap.get(jobId)?.jobNumber ?? "-";
+
+  const cashflowRows: CashflowRowView[] = cashflows
+    .map((flow) => ({
+      id: flow.id,
+      occurredOn: flow.occurredOn,
+      direction: flow.direction,
+      category: flow.category,
+      description: flow.description,
+      amount: flow.amount,
+      jobLabel: jobLabel(flow.jobId),
+    }))
+    .sort((a, b) => b.occurredOn.localeCompare(a.occurredOn));
+
+  return {
+    clientSchedules: clientSchedules
+      .map((schedule) => toClientScheduleView(schedule, cashflows))
+      .sort((a, b) => jobNumber(a.jobId).localeCompare(jobNumber(b.jobId))),
+    vendorSchedules: vendorSchedules
+      .map((schedule) => toVendorScheduleView(schedule, cashflows))
+      .sort((a, b) => jobNumber(a.jobId).localeCompare(jobNumber(b.jobId))),
+    cashflows: cashflowRows,
+    totals,
   };
 }
 
 /* -------------------------------------------------------------------------- */
-/* Job & relasi CRUD — service sebagai business layer.                         */
+/* Job writes                                                                 */
 /* -------------------------------------------------------------------------- */
 
 export interface JobInput {
-  jobNumber: string;
+  jobNumber?: string;
   jobName: string;
-  category: Job["category"];
+  category: JobCategory;
   clientId?: string;
   vendorId?: string;
-  venueId?: string;
+  packageId?: string;
   executionDate: string;
-  status: Job["status"];
+  status: JobStatus;
   location?: string;
   notes?: string;
-}
-
-function validateJobInput(input: JobInput): void {
-  if (!input.jobNumber?.trim()) throw new Error("Job number wajib diisi.");
-  if (!input.jobName?.trim()) throw new Error("Nama job wajib diisi.");
-  if (!input.executionDate?.trim()) throw new Error("Tanggal eksekusi wajib diisi.");
-  if (!Object.values(JOB_CATEGORY).includes(input.category)) {
-    throw new Error("Kategori job tidak valid.");
-  }
-  if (!Object.values(JOB_STATUS).includes(input.status)) {
-    throw new Error("Status job tidak valid.");
-  }
-  const hasClient = !!input.clientId;
-  const hasVendor = !!input.vendorId;
-  if (hasClient === hasVendor) {
-    throw new Error("Job wajib memiliki clientId ATAU vendorId (tidak keduanya, tidak kosong).");
-  }
-}
-
-async function assertRelationsExist(input: JobInput): Promise<void> {
-  const repos = getRepositories();
-  if (input.clientId && !(await repos.clients.getById(input.clientId))) {
-    throw new Error(`Client '${input.clientId}' tidak ditemukan.`);
-  }
-  if (input.vendorId && !(await repos.vendors.getById(input.vendorId))) {
-    throw new Error(`Vendor '${input.vendorId}' tidak ditemukan.`);
-  }
-  if (input.venueId && !(await repos.venues.getById(input.venueId))) {
-    throw new Error(`Venue '${input.venueId}' tidak ditemukan.`);
-  }
-}
-
-async function assertUniqueJobNumber(jobNumber: string, ignoreId?: string): Promise<void> {
-  const jobs = await getRepositories().jobs.getAll();
-  if (jobs.some((job) => job.jobNumber === jobNumber && job.id !== ignoreId)) {
-    throw new Error(`Job number '${jobNumber}' sudah dipakai job lain.`);
-  }
+  legacyVenueName?: string;
 }
 
 export async function createJob(input: JobInput): Promise<Job> {
-  validateJobInput(input);
-  await assertRelationsExist(input);
-  await assertUniqueJobNumber(input.jobNumber);
-  return getRepositories().jobs.create({
-    ...input,
-    jobNumber: input.jobNumber.trim(),
-    jobName: input.jobName.trim(),
-  });
+  const app = getApplication();
+  return app.services.jobs.createJob(normalizeJobInput(input));
 }
 
 export async function updateJob(id: string, input: JobInput): Promise<Job> {
-  validateJobInput(input);
-  const existing = await getRepositories().jobs.getById(id);
-  if (!existing) {
-    throw new Error(`Job dengan id '${id}' tidak ditemukan.`);
+  const app = getApplication();
+  const jobNumber = input.jobNumber?.trim() ?? "";
+  if (!jobNumber) throw new Error("Job number wajib diisi.");
+  const existing = await app.services.jobs.getJobByNumber(jobNumber);
+  if (existing && existing.id !== id) {
+    throw new Error(`Job number '${jobNumber}' sudah dipakai job lain.`);
   }
-  await assertRelationsExist(input);
-  await assertUniqueJobNumber(input.jobNumber, id);
-  return getRepositories().jobs.update(id, {
-    ...input,
-    jobNumber: input.jobNumber.trim(),
+  return app.services.jobs.updateJob(id, normalizeJobInput(input));
+}
+
+function normalizeJobInput(input: JobInput): CreateJobInput {
+  return {
+    jobNumber: input.jobNumber?.trim(),
     jobName: input.jobName.trim(),
-  });
+    category: input.category,
+    clientId: hasValue(input.clientId) ? input.clientId : undefined,
+    vendorId: hasValue(input.vendorId) ? input.vendorId : undefined,
+    packageId: hasValue(input.packageId) ? input.packageId : undefined,
+    executionDate: input.executionDate,
+    status: input.status,
+    location: hasValue(input.location) ? input.location.trim() : undefined,
+    notes: hasValue(input.notes) ? input.notes.trim() : undefined,
+    legacyVenueName: hasValue(input.legacyVenueName) ? input.legacyVenueName.trim() : undefined,
+  };
 }
 
 export async function deleteJob(id: string): Promise<void> {
-  return getRepositories().jobs.delete(id);
+  return getApplication().services.jobs.deleteJob(id);
 }
 
-async function assertJobExists(jobId: string): Promise<void> {
-  if (!(await getRepositories().jobs.getById(jobId))) {
-    throw new Error(`Job '${jobId}' tidak ditemukan.`);
-  }
+/* -------------------------------------------------------------------------- */
+/* Crew assignment writes (obligation only)                                   */
+/* -------------------------------------------------------------------------- */
+
+export type JobCrewInput = CreateJobCrewAssignmentInput;
+
+export async function createJobCrew(input: JobCrewInput): Promise<JobCrewAssignment> {
+  return getApplication().repositories.jobCrewAssignments.create(input);
 }
 
-/* JobCrew */
-
-export async function createJobCrew(input: Omit<JobCrew, "id">): Promise<JobCrew> {
-  await assertJobExists(input.jobId);
-  if (!(await getRepositories().crew.getById(input.crewId))) {
-    throw new Error(`Crew '${input.crewId}' tidak ditemukan.`);
-  }
-  if (!Number.isFinite(input.actualPayment) || input.actualPayment < 0) {
-    throw new Error("Payment crew harus angka valid (>= 0).");
-  }
-  if (input.paymentStatus && !Object.values(PAYMENT_STATUS).includes(input.paymentStatus)) {
-    throw new Error("Payment status crew tidak valid.");
-  }
-  return getRepositories().jobCrews.create(input);
-}
-
-export async function updateJobCrew(id: string, input: Omit<JobCrew, "id">): Promise<JobCrew> {
-  await assertJobExists(input.jobId);
-  if (!(await getRepositories().crew.getById(input.crewId))) {
-    throw new Error(`Crew '${input.crewId}' tidak ditemukan.`);
-  }
-  if (!Number.isFinite(input.actualPayment) || input.actualPayment < 0) {
-    throw new Error("Payment crew harus angka valid (>= 0).");
-  }
-  if (input.paymentStatus && !Object.values(PAYMENT_STATUS).includes(input.paymentStatus)) {
-    throw new Error("Payment status crew tidak valid.");
-  }
-  return getRepositories().jobCrews.update(id, input);
+export async function updateJobCrew(
+  id: string,
+  input: JobCrewInput,
+): Promise<JobCrewAssignment> {
+  return getApplication().repositories.jobCrewAssignments.update(id, input);
 }
 
 export async function deleteJobCrew(id: string): Promise<void> {
-  return getRepositories().jobCrews.delete(id);
+  return getApplication().repositories.jobCrewAssignments.delete(id);
 }
 
-/* Delivery */
+/* -------------------------------------------------------------------------- */
+/* Delivery writes                                                            */
+/* -------------------------------------------------------------------------- */
 
-export async function createDelivery(input: Omit<Delivery, "id">): Promise<Delivery> {
-  await assertJobExists(input.jobId);
-  if (!input.name?.trim()) throw new Error("Nama delivery wajib diisi.");
-  if (!input.deadline?.trim()) throw new Error("Deadline delivery wajib diisi.");
-  if (!Object.values(DELIVERY_STATUS).includes(input.status)) {
-    throw new Error("Status delivery tidak valid.");
-  }
-  if (input.quantity !== undefined && (!Number.isFinite(input.quantity) || input.quantity < 0)) {
-    throw new Error("Quantity delivery harus angka valid (>= 0).");
-  }
-  return getRepositories().deliveries.create(input);
+export async function createDelivery(input: CreateDeliveryInput): Promise<Delivery> {
+  return getApplication().services.deliveries.createDelivery(input);
 }
 
-export async function updateDelivery(id: string, input: Omit<Delivery, "id">): Promise<Delivery> {
-  await assertJobExists(input.jobId);
-  if (!input.name?.trim()) throw new Error("Nama delivery wajib diisi.");
-  if (!input.deadline?.trim()) throw new Error("Deadline delivery wajib diisi.");
-  if (!Object.values(DELIVERY_STATUS).includes(input.status)) {
-    throw new Error("Status delivery tidak valid.");
-  }
-  if (input.quantity !== undefined && (!Number.isFinite(input.quantity) || input.quantity < 0)) {
-    throw new Error("Quantity delivery harus angka valid (>= 0).");
-  }
-  return getRepositories().deliveries.update(id, input);
+export async function updateDelivery(
+  id: string,
+  input: CreateDeliveryInput,
+): Promise<Delivery> {
+  return getApplication().services.deliveries.updateDelivery(id, input);
 }
 
 export async function deleteDelivery(id: string): Promise<void> {
-  return getRepositories().deliveries.delete(id);
+  return getApplication().services.deliveries.deleteDelivery(id);
 }
 
-/* Client payment */
+/* -------------------------------------------------------------------------- */
+/* Payment schedules (obligations — NOT cash)                                 */
+/* -------------------------------------------------------------------------- */
 
-export async function createClientPayment(input: Omit<ClientPayment, "id">): Promise<ClientPayment> {
-  await assertJobExists(input.jobId);
-  if (!Object.values(CLIENT_PAYMENT_TERM).includes(input.term)) {
-    throw new Error("Termin client payment tidak valid.");
-  }
-  if (!Object.values(PAYMENT_STATUS).includes(input.status)) {
-    throw new Error("Status pembayaran tidak valid.");
-  }
-  if (!Number.isFinite(input.amount) || input.amount < 0) {
-    throw new Error("Amount harus angka valid (>= 0).");
-  }
-  return getRepositories().clientPayments.create(input);
+export async function createClientSchedule(
+  input: CreateClientPaymentScheduleInput,
+): Promise<ClientPaymentSchedule> {
+  return getApplication().financial.createClientPaymentSchedule(input);
 }
 
-export async function updateClientPayment(id: string, input: Omit<ClientPayment, "id">): Promise<ClientPayment> {
-  await assertJobExists(input.jobId);
-  if (!Object.values(CLIENT_PAYMENT_TERM).includes(input.term)) {
-    throw new Error("Termin client payment tidak valid.");
-  }
-  if (!Object.values(PAYMENT_STATUS).includes(input.status)) {
-    throw new Error("Status pembayaran tidak valid.");
-  }
-  if (!Number.isFinite(input.amount) || input.amount < 0) {
-    throw new Error("Amount harus angka valid (>= 0).");
-  }
-  return getRepositories().clientPayments.update(id, input);
+export async function updateClientSchedule(
+  id: string,
+  input: CreateClientPaymentScheduleInput,
+): Promise<ClientPaymentSchedule> {
+  return getApplication().financial.updateClientPaymentSchedule(id, input);
 }
 
-export async function deleteClientPayment(id: string): Promise<void> {
-  return getRepositories().clientPayments.delete(id);
+export async function createVendorSchedule(
+  input: CreateVendorPaymentScheduleInput,
+): Promise<VendorPaymentSchedule> {
+  return getApplication().financial.createVendorPaymentSchedule(input);
 }
 
-/* Vendor payment */
-
-export async function createVendorPayment(input: Omit<VendorPayment, "id">): Promise<VendorPayment> {
-  await assertJobExists(input.jobId);
-  if (!Object.values(VENDOR_PAYMENT_TYPE).includes(input.type)) {
-    throw new Error("Tipe vendor payment tidak valid.");
-  }
-  if (!Object.values(PAYMENT_STATUS).includes(input.status)) {
-    throw new Error("Status pembayaran tidak valid.");
-  }
-  if (!Number.isFinite(input.amount) || input.amount < 0) {
-    throw new Error("Amount harus angka valid (>= 0).");
-  }
-  return getRepositories().vendorPayments.create(input);
+export async function updateVendorSchedule(
+  id: string,
+  input: CreateVendorPaymentScheduleInput,
+): Promise<VendorPaymentSchedule> {
+  return getApplication().financial.updateVendorPaymentSchedule(id, input);
 }
 
-export async function updateVendorPayment(id: string, input: Omit<VendorPayment, "id">): Promise<VendorPayment> {
-  await assertJobExists(input.jobId);
-  if (!Object.values(VENDOR_PAYMENT_TYPE).includes(input.type)) {
-    throw new Error("Tipe vendor payment tidak valid.");
-  }
-  if (!Object.values(PAYMENT_STATUS).includes(input.status)) {
-    throw new Error("Status pembayaran tidak valid.");
-  }
-  if (!Number.isFinite(input.amount) || input.amount < 0) {
-    throw new Error("Amount harus angka valid (>= 0).");
-  }
-  return getRepositories().vendorPayments.update(id, input);
+/* -------------------------------------------------------------------------- */
+/* Actual cash (canonical cashflows, idempotent)                              */
+/* -------------------------------------------------------------------------- */
+
+export interface RecordClientPaymentInput {
+  scheduleId: string;
+  amount: Amount;
+  occurredOn: string;
+  description?: string;
+  /** Wajib: idempotensi DIDUKUNG DATABASE (UNIQUE + sidik jari payload). */
+  idempotencyKey: string;
 }
 
-export async function deleteVendorPayment(id: string): Promise<void> {
-  return getRepositories().vendorPayments.delete(id);
+export interface RecordVendorPaymentInput {
+  scheduleId: string;
+  amount: Amount;
+  occurredOn: string;
+  description?: string;
+  idempotencyKey: string;
 }
 
-/* Expense */
-
-export async function createExpense(input: Omit<Expense, "id">): Promise<Expense> {
-  await assertJobExists(input.jobId);
-  if (!input.description?.trim()) throw new Error("Deskripsi expense wajib diisi.");
-  if (!input.category?.trim()) throw new Error("Kategori expense wajib diisi.");
-  if (!input.date?.trim()) throw new Error("Tanggal expense wajib diisi.");
-  if (!Number.isFinite(input.amount) || input.amount < 0) {
-    throw new Error("Amount harus angka valid (>= 0).");
-  }
-  return getRepositories().expenses.create(input);
+export interface RecordCrewPaymentInput {
+  assignmentId: string;
+  amount: Amount;
+  occurredOn: string;
+  description?: string;
+  idempotencyKey: string;
 }
 
-export async function updateExpense(id: string, input: Omit<Expense, "id">): Promise<Expense> {
-  await assertJobExists(input.jobId);
-  if (!input.description?.trim()) throw new Error("Deskripsi expense wajib diisi.");
-  if (!input.category?.trim()) throw new Error("Kategori expense wajib diisi.");
-  if (!input.date?.trim()) throw new Error("Tanggal expense wajib diisi.");
-  if (!Number.isFinite(input.amount) || input.amount < 0) {
-    throw new Error("Amount harus angka valid (>= 0).");
-  }
-  return getRepositories().expenses.update(id, input);
+export interface RecordExpenseInput {
+  jobId?: string;
+  category: Extract<CashflowCategory, "TRANSPORT" | "EQUIPMENT" | "OTHER">;
+  amount: Amount;
+  occurredOn: string;
+  description: string;
+  idempotencyKey: string;
 }
 
-export async function deleteExpense(id: string): Promise<void> {
-  return getRepositories().expenses.delete(id);
+export async function recordClientPayment(input: RecordClientPaymentInput) {
+  return getApplication().financial.recordClientPayment(input);
+}
+
+export async function recordVendorPayment(input: RecordVendorPaymentInput) {
+  return getApplication().financial.recordVendorPayment(input);
+}
+
+export async function recordCrewPayment(input: RecordCrewPaymentInput) {
+  return getApplication().financial.recordCrewPayment(input);
+}
+
+export async function recordExpense(input: RecordExpenseInput) {
+  return getApplication().financial.recordGeneralExpense({
+    jobId: hasValue(input.jobId) ? input.jobId : undefined,
+    category: input.category,
+    amount: input.amount,
+    occurredOn: input.occurredOn,
+    description: input.description,
+    idempotencyKey: input.idempotencyKey,
+  });
 }

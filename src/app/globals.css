@@ -3,33 +3,38 @@
 /*
  * Design token Air Production DB — Phase 1.5 (UI Visual Refinement).
  *
- * Prinsip: minimalis, dominan putih, whitespace lega, shadow sangat halus,
- * border tipis, satu accent color yang restrained.
+ * Prinsip: hangat dan tenang, mudah dipindai saat hari acara yang sibuk,
+ * dengan aksen rose yang tetap nyaman untuk penggunaan operasional harian.
  */
 @theme {
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
   /* Surface */
-  --color-app: #f7f7f7;
+  --color-app: #faf8f6;
   --color-panel: #ffffff;
 
   /* Border tipis dan subtle */
-  --color-line: #e8e8e8;
+  --color-line: #eee7e3;
 
   /* Teks */
-  --color-ink: #171717;
-  --color-ink-soft: #737373;
-  --color-ink-muted: #a3a3a3;
+  --color-ink: #292321;
+  --color-ink-soft: #766b67;
+  --color-ink-muted: #a99d98;
 
   /* Satu accent color, restrained. Dipakai hanya untuk link, focus, dan badge. */
-  --color-brand: #2f5fe0;
-  --color-brand-soft: #eff3fc;
+  --color-brand: #a64f61;
+  --color-brand-soft: #fbf0f1;
 }
 
 html,
 body {
   height: 100%;
+}
+
+::selection {
+  background: #f2dce0;
+  color: #542934;
 }
 
 body {

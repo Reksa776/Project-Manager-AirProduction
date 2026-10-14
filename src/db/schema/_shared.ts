@@ -1,30 +1,13 @@
-import { sql } from "drizzle-orm";
-import { date, integer, timestamp, varchar } from "drizzle-orm/pg-core";
+import { timestamp } from "drizzle-orm/pg-core";
 
-/**
- * Kolom timestamp standar untuk seluruh tabel record.
- *
- * Kebijakan timezone (Phase 1):
- * - Semua nilai DATETIME disimpan sebagai **UTC**.
- * - Koneksi database menyetel `time_zone = '+00:00'` per koneksi (lihat src/db/index.ts),
- *   sehingga DEFAULT CURRENT_TIMESTAMP(3) selalu menghasilkan UTC.
- * - Mode string dipilih agar tidak ada konversi timezone ambigu di driver.
- *
- * CATATAN PENTING (limitasi drizzle-orm 0.45):
- * Builder `datetime` TIDAK menyediakan method `onUpdateNow()` (hanya `timestamp`
- * yang memilikinya; `timestamp` punya batis year-2038 sehingga tidak dipakai).
- * Karena itu clause `on update CURRENT_TIMESTAMP(3)` untuk `updated_at`
- * DITAMBAHKAN MANUAL pada file SQL migration (drizzle/0000_*.sql) setelah
- * `drizzle-kit generate`. Migration file di-commit ke git sehingga tetap
- * deterministik dan reviewable. Lihat docs/PHASE-1-MYSQL-FOUNDATION.md.
- */
+/** UTC timestamps shared by every PostgreSQL record table. */
 export function timestamps() {
   return {
-    createdAt: timestamp("created_at", { mode: "string" })
+    createdAt: timestamp("created_at", { mode: "string", precision: 3 })
       .notNull()
-      .default(sql`(CURRENT_TIMESTAMP(3))`),
-    updatedAt: timestamp("updated_at", { mode: "string" })
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "string", precision: 3 })
       .notNull()
-      .default(sql`(CURRENT_TIMESTAMP(3))`),
+      .defaultNow(),
   };
 }

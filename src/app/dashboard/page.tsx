@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AppShell } from "@/components/layout/app-shell";
 import { SummaryCard } from "@/components/dashboard/summary-card";
 import {
   Card,
@@ -17,71 +18,78 @@ import {
 } from "@/components/ui";
 import { getDashboardData } from "@/services/dashboard-service";
 import { formatCountdown, formatShortDate } from "@/lib/utils";
+import { requireAuthenticatedAdmin } from "@/lib/auth";
 
 export const metadata = {
   title: "Dashboard · Air Production DB",
 };
 
+// Data dibaca from MySQL saat runtime — JANGAN diprerender statis (build harus
+// bebas kredensial eksternal dan bebas koneksi database).
+export const dynamic = "force-dynamic";
+
 export default async function DashboardPage() {
+  const admin = await requireAuthenticatedAdmin();
   const { summary, incomingWeddings, incomingEditing } =
     await getDashboardData();
 
   return (
+    <AppShell adminName={admin.name}>
     <div className="space-y-8">
       <PageHeader
-        title="Dashboard"
-        description="Ringkasan operasional Air Production: pekerjaan aktif, jadwal wedding terdekat, dan delivery yang harus diselesaikan."
+        title="Overview acara"
+        description="Track jobs, upcoming weddings, and deliverables that need attention."
       />
 
-      {/* Ringkasan job sekaligus status job dalam satu baris yang ringkas. */}
+      {/* Overview job sekaligus status job dalam satu baris yang ringkas. */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
-          label="Total Jobs"
+          label="Total jobs"
           value={summary.totalJobs}
-          hint="Seluruh pekerjaan tercatat"
+          hint="All events and productions"
         />
         <SummaryCard
-          label="Belum Dikerjakan"
+          label="Not started"
           value={summary.notStarted}
-          hint="Menunggu dijadwalkan"
+          hint="Ready to be planned"
         />
         <SummaryCard
-          label="Sedang Dikerjakan"
+          label="In progress"
           value={summary.inProgress}
-          hint="Sedang dalam proses"
+          hint="Dalam persiapan atau produksi"
         />
         <SummaryCard
-          label="Sudah Dikerjakan"
+          label="Selesai"
           value={summary.completed}
-          hint="Pekerjaan selesai"
+          hint="Produksi telah dituntaskan"
         />
       </section>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Card>
           <CardHeader
-            title="Incoming Wedding"
-            description="Jadwal wedding terdekat berdasarkan tanggal pelaksanaan."
+            title="Upcoming Weddings"
+            description="Upcoming events, sorted by event date."
             action={
               <Link
                 href="/jobs"
                 className="text-[13px] font-medium text-brand hover:underline"
               >
-                Lihat semua job
+                View all jobs
               </Link>
             }
           />
           {incomingWeddings.length === 0 ? (
             <EmptyState
               icon="calendar"
-              title="Belum ada jadwal wedding"
-              description="Jadwal wedding akan muncul di sini setelah job kategori Wedding ditambahkan."
+              title="No upcoming weddings"
+              description="Recorded weddings will appear here, sorted by event date."
             />
           ) : (
             <Table>
               <THead>
                 <TR>
-                  <TH>Tanggal</TH>
+                  <TH>Date</TH>
                   <TH>Job</TH>
                   <TH>Client/Vendor</TH>
                   <TH>Status</TH>
@@ -106,7 +114,7 @@ export default async function DashboardPage() {
                         {item.jobName}
                       </Link>
                       <p className="mt-0.5 text-[12px] text-ink-muted">
-                        {item.venueName ?? item.jobNumber}
+                        {item.jobNumber}
                       </p>
                     </TD>
                     <TD className="text-ink-soft">{item.counterpartyName}</TD>
@@ -122,14 +130,14 @@ export default async function DashboardPage() {
 
         <Card>
           <CardHeader
-            title="Incoming Editing"
-            description="Delivery belum selesai berdasarkan deadline terdekat."
+            title="Editing and Deliverables"
+            description="Incomplete deliverables, sorted by the nearest deadline."
           />
           {incomingEditing.length === 0 ? (
             <EmptyState
               icon="film"
-              title="Tidak ada editing yang menunggu"
-              description="Semua delivery sudah selesai. Delivery baru akan tampil di sini beserta deadline-nya."
+              title="No edits waiting"
+              description="All deliverables are complete. New work will appear here with its deadline."
             />
           ) : (
             <Table>
@@ -173,5 +181,6 @@ export default async function DashboardPage() {
         </Card>
       </div>
     </div>
+    </AppShell>
   );
 }

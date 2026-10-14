@@ -23,10 +23,22 @@ import type { FinanceActionResult } from "@/app/actions/finance-actions";
 export interface FinanceFieldConfig {
   key: string;
   label: string;
-  type?: "text" | "number" | "select" | "date" | "textarea";
+  /**
+   * `hidden` = ikut draft tetapi tidak dirender (mis. `idempotencyKey` yang
+   * diisi otomatis agar pencatatan kas tetap idempoten tanpa input manual).
+   */
+  type?: "text" | "number" | "select" | "date" | "textarea" | "hidden";
   options?: Array<{ value: string; label: string }>;
   placeholder?: string;
   hint?: string;
+  /** Nilai awal draft (harus string agar aman dilewatkan from server component). */
+  defaultValue?: string;
+  /**
+   * Untuk field kunci idempotensi: buat nilai acak baru SETIAP kali modal
+   * tambah dibuka (dijalankan di klien). Ini menjaga pencatatan kas tetap
+   * idempoten tanpa input manual dan tanpa fungsi non-serializable from server.
+   */
+  autoKey?: boolean;
 }
 
 export interface FinanceCrudProps {
@@ -39,13 +51,25 @@ export interface FinanceCrudProps {
   fields: FinanceFieldConfig[];
   filter?: { key: string; options: Array<{ value: string; label: string }> };
   totals?: Array<{ label: string; value: string }>;
-  createAction: (values: Record<string, string>) => Promise<FinanceActionResult>;
-  updateAction: (id: string, values: Record<string, string>) => Promise<FinanceActionResult>;
-  deleteAction: (id: string) => Promise<FinanceActionResult>;
+  /**
+   * Actions bersifat OPSIONAL dan ditampilkan hanya bila diberikan. Ini mencegah
+   * tombol Edit/Delete palsu: jadwal kanonik tidak memiliki operasi delete, dan
+   * kas kanonik (cashflow) tidak memiliki update/delete.
+   */
+  createAction?: (values: Record<string, string>) => Promise<FinanceActionResult>;
+  updateAction?: (id: string, values: Record<string, string>) => Promise<FinanceActionResult>;
+  deleteAction?: (id: string) => Promise<FinanceActionResult>;
 }
 
-function emptyDraft(fields: FinanceFieldConfig[]): Record<string, string> {
-  return Object.fromEntries(fields.map((f) => [f.key, ""]));
+function randomKey(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return `key-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function emptyDraft(fields: FinanceFieldConfig[], fresh = false): Record<string, string> {
+  return Object.fromEntries(
+    fields.map((f) => [f.key, f.autoKey && fresh ? randomKey() : (f.defaultValue ?? "")]),
+  );
 }
 
 export function FinanceCrud({
@@ -81,7 +105,7 @@ export function FinanceCrud({
 
   function openCreate() {
     setEditingId(null);
-    setDraft(emptyDraft(fields));
+    setDraft(emptyDraft(fields, true));
     setModalError(null);
     setModalOpen(true);
   }
@@ -94,14 +118,29 @@ export function FinanceCrud({
   async function handleSubmit() {
     setBusy(true);
     setModalError(null);
-    const result = editingId ? await updateAction(editingId, draft) : await createAction(draft);
+    let result: FinanceActionResult;
+    if (editingId) {
+      if (!updateAction) {
+        setBusy(false);
+        setModalError("Editing is not supported for this item.");
+        return;
+      }
+      result = await updateAction(editingId, draft);
+    } else {
+      if (!createAction) {
+        setBusy(false);
+        setModalError("Creating this item is not supported.");
+        return;
+      }
+      result = await createAction(draft);
+    }
     setBusy(false);
     if (!result.ok) { setModalError(result.error); return; }
     setModalOpen(false);
     router.refresh();
   }
   async function handleConfirmDelete() {
-    if (!deleteTarget) return;
+    if (!deleteTarget || !deleteAction) return;
     setBusy(true);
     setDeleteError(null);
     const result = await deleteAction(deleteTarget.id);
@@ -114,11 +153,11 @@ export function FinanceCrud({
   return (
     <Card className="overflow-hidden">
       <CardHeader title={title} description={description} />
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-6 py-4">
-        <div className="min-w-52 flex-1 sm:max-w-xs">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-4 sm:px-6">
+        <div className="w-full min-w-0 flex-1 sm:w-64 sm:max-w-xs">
           <Input
-            aria-label={`Cari ${entityLabel}`}
-            placeholder={`Cari ${entityLabel.toLowerCase()}...`}
+            aria-label={`Search ${entityLabel}`}
+            placeholder={`Search ${entityLabel.toLowerCase()}...`}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -127,16 +166,18 @@ export function FinanceCrud({
           <div className="w-full sm:w-44">
             <Select
               aria-label={`Filter ${entityLabel}`}
-              options={[{ value: "", label: "Semua" }, ...filter.options]}
+              options={[{ value: "", label: "All" }, ...filter.options]}
               value={filterValue}
               onChange={(e) => setFilterValue(e.target.value)}
             />
           </div>
         ) : null}
-        <p className="text-[13px] text-ink-muted">{filtered.length} dari {rows.length}</p>
-        <Button size="sm" variant="primary" onClick={openCreate}>
-          Tambah
-        </Button>
+        <p className="text-[13px] text-ink-muted">{filtered.length} from {rows.length}</p>
+        {createAction ? (
+          <Button size="sm" variant="primary" onClick={openCreate}>
+            Add
+          </Button>
+        ) : null}
       </div>
       {totals && totals.length > 0 ? (
         <div className="flex flex-wrap gap-6 border-b border-line bg-app/40 px-6 py-3">
@@ -152,29 +193,31 @@ export function FinanceCrud({
       {rows.length === 0 ? (
         <EmptyState
           icon="finance"
-          title={`Belum ada ${entityLabel.toLowerCase()}`}
-          description="Data yang tersimpan akan tampil di sini."
+          title={`No data yet ${entityLabel.toLowerCase()}`}
+          description="Saved data will appear here."
           action={
-            <Button size="sm" variant="secondary" onClick={openCreate}>
-              Tambah {entityLabel}
-            </Button>
+            createAction ? (
+              <Button size="sm" variant="secondary" onClick={openCreate}>
+                Add {entityLabel}
+              </Button>
+            ) : undefined
           }
         />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon="finance"
-          title="Tidak ditemukan"
-          description={`Tidak ada ${entityLabel.toLowerCase()} yang cocok dengan pencarian/filter saat ini.`}
+          title="No results found"
+          description={`No ${entityLabel.toLowerCase()} yang cocok dengan pencarian/filter saat ini.`}
         />
       ) : (
-        <div className="overflow-x-auto">
+          <div className="min-w-0 max-w-full overflow-x-auto">
           <Table>
             <THead>
               <TR>
                 {columns.map((col) => (
                   <TH key={col.key}>{col.label}</TH>
                 ))}
-                <TH>Aksi</TH>
+                <TH>Actions</TH>
               </TR>
             </THead>
             <TBody>
@@ -187,12 +230,16 @@ export function FinanceCrud({
                   ))}
                   <TD>
                     <div className="flex gap-2">
-                      <button type="button" className="text-[13px] text-brand hover:underline" onClick={() => openEdit(row)} disabled={busy}>
-                        Edit
-                      </button>
-                      <button type="button" className="text-[13px] text-[#a1352b] hover:underline" onClick={() => { setDeleteError(null); setDeleteTarget(row); }} disabled={busy}>
-                        Hapus
-                      </button>
+                      {updateAction ? (
+                        <button type="button" className="text-[13px] text-brand hover:underline" onClick={() => openEdit(row)} disabled={busy}>
+                          Edit
+                        </button>
+                      ) : null}
+                      {deleteAction ? (
+                        <button type="button" className="text-[13px] text-[#a1352b] hover:underline" onClick={() => { setDeleteError(null); setDeleteTarget(row); }} disabled={busy}>
+                          Delete
+                        </button>
+                      ) : null}
                     </div>
                   </TD>
                 </TR>
@@ -205,14 +252,14 @@ export function FinanceCrud({
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editingId ? `Edit ${entityLabel}` : `Tambah ${entityLabel}`}
+        title={editingId ? `Edit ${entityLabel}` : `Add ${entityLabel}`}
         footer={
           <>
             <Button variant="secondary" onClick={() => setModalOpen(false)} disabled={busy}>
-              Batal
+              Cancel
             </Button>
             <Button variant="primary" onClick={handleSubmit} disabled={busy}>
-              {busy ? "Menyimpan..." : "Simpan"}
+              {busy ? "Saving..." : "Save"}
             </Button>
           </>
         }
@@ -224,13 +271,14 @@ export function FinanceCrud({
             </p>
           ) : null}
           {fields.map((field) => {
+            if (field.type === "hidden") return null;
             if (field.type === "select") {
               return (
                 <Select
                   key={field.key}
                   label={field.label}
                   options={field.options ?? []}
-                  placeholder={field.placeholder ?? "-- Pilih --"}
+                  placeholder={field.placeholder ?? "-- Select --"}
                   value={draft[field.key] ?? ""}
                   onChange={(e) => setDraft((p) => ({ ...p, [field.key]: e.target.value }))}
                 />
@@ -252,10 +300,9 @@ export function FinanceCrud({
               <Input
                 key={field.key}
                 label={field.label}
-                type="text"
-                inputMode={field.type === "number" ? "numeric" : field.type === "date" ? "text" : undefined}
+                type={field.type === "date" ? "date" : "text"}
+                inputMode={field.type === "number" ? "numeric" : undefined}
                 hint={field.hint}
-                placeholder={field.type === "date" ? "YYYY-MM-DD" : undefined}
                 value={draft[field.key] ?? ""}
                 onChange={(e) => setDraft((p) => ({ ...p, [field.key]: e.target.value }))}
               />
@@ -267,15 +314,15 @@ export function FinanceCrud({
       <Modal
         open={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
-        title={`Hapus ${entityLabel}`}
-        description="Yakin ingin menghapus item ini? Tindakan tidak dapat dibatalkan."
+        title={`Delete ${entityLabel}`}
+        description="Are you sure you want to delete this item? This action cannot be undone."
         footer={
           <>
             <Button variant="secondary" onClick={() => setDeleteTarget(null)} disabled={busy}>
-              Batal
+              Cancel
             </Button>
             <Button variant="danger" onClick={handleConfirmDelete} disabled={busy}>
-              {busy ? "Menghapus..." : "Hapus"}
+              {busy ? "Deleting..." : "Delete"}
             </Button>
           </>
         }

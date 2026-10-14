@@ -1,7 +1,8 @@
 /**
  * Environment helper untuk koneksi database (server-side only).
  *
- * Sumber kebenaran koneksi: variabel DATABASE_URL.
+ * Runtime uses Supabase PostgreSQL through DATABASE_URL. The legacy
+ * MySQL_SOURCE_URL is reserved for one-time source reads during data migration.
  * Nilai credentials TIDAK PERNAH dicetak/di-log — hanya pesan error umum.
  */
 
@@ -16,8 +17,8 @@ export function ensureEnvFileLoaded(): void {
 
 /**
  * Baca dan validasi DATABASE_URL.
- * Fail-loud bila kosong / bukan connection string postgresql://.
- * Seluruh selubung tanda kutip dilepas agar aman untuk format `DATABASE_URL="postgres://..."`.
+ * Fail-loud bila kosong / bukan PostgreSQL connection string.
+ * Seluruh selubung tanda kutip dilepas agar aman untuk file .env.
  */
 export function getDatabaseUrl(): string {
   ensureEnvFileLoaded();
@@ -37,9 +38,21 @@ export function getDatabaseUrl(): string {
     url = url.slice(1, -1);
   }
 
-  if (!/^postgresql:/i.test(url) && !/^postgres:/i.test(url)) {
-    throw new Error("DATABASE_URL tidak valid: harus diawali dengan skema postgresql:// atau postgres://.");
+  if (!/^postgres(?:ql)?:/i.test(url)) {
+    throw new Error(
+      "DATABASE_URL tidak valid: harus diawali dengan skema postgres:// atau postgresql://.",
+    );
   }
 
   return url;
+}
+
+/** Sumber MySQL lama untuk preflight/migrasi data menuju Supabase. */
+export function getMySqlSourceUrl(): string {
+  ensureEnvFileLoaded();
+  const raw = process.env.MYSQL_SOURCE_URL;
+  if (!raw || !/^(mysql|mariadb):\/\//i.test(raw.trim())) {
+    throw new Error("MYSQL_SOURCE_URL harus diatur ke koneksi MySQL sumber.");
+  }
+  return raw.trim().replace(/^mariadb:/i, "mysql:");
 }

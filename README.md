@@ -1,92 +1,58 @@
-# Air Production DB
+# Air Production
 
-Sistem manajemen operasional internal untuk production/documentation business.
+Wedding and event operations dashboard built with Next.js, Drizzle ORM, and
+Supabase PostgreSQL. The dashboard's existing admin login remains server-side;
+database credentials must never use a `NEXT_PUBLIC_` variable.
 
-> Status saat ini: **Phase 2G**.
-> Data aktif berasal dari **Google Sheets** (read + write untuk entity
-> bisnis). Mock repository tetap tersedia sebagai fallback/testing.
-> CRUD UI minimal tersedia pada Clients, Vendors, Venues, dan Crew.
+## Supabase setup
 
-## Menjalankan Project
+1. Create a Supabase project and open **Project Settings → Database → Connect**.
+2. Copy a PostgreSQL connection string (Session Pooler or Direct connection).
+3. Fill `DATABASE_URL` in the ignored local `.env` file. Keep the TLS option
+   (`sslmode=require`) Supabase provides.
+4. Apply the PostgreSQL schema:
+
+   ```bash
+   npm run db:migrate
+   ```
+
+5. If moving existing MySQL data, put that connection in `MYSQL_SOURCE_URL` in
+   `.env`, then run the guarded one-time transfer:
+
+   ```bash
+   npm run db:transfer
+   ```
+
+   The transfer reads only the allowlisted business tables, leaves legacy-only
+   venue/expense tables behind, and refuses to overwrite existing target data.
+   Seeded `Editor`/`Videographer` roles are matched by name. Apply migrations
+   before transferring. Keep a database backup.
+
+6. Add default crew roles if needed:
+
+   ```bash
+   npm run db:seed
+   ```
+
+The committed template is `.env.example`; `.env` is ignored by Git. Never paste
+Supabase credentials into source files or `NEXT_PUBLIC_*` variables.
+
+## Local development
 
 ```bash
 npm install
 npm run dev
 ```
 
-Buka http://localhost:3000 — halaman akan diarahkan otomatis ke `/dashboard`.
-
-Perintah lain:
+Useful commands:
 
 ```bash
-npm run typecheck   # TypeScript strict
-npm run lint        # ESLint
-npm run build       # Production build
-npm run start       # Menjalankan hasil build
+npm run typecheck
+npm run lint
+npm run db:generate -- --name=describe_schema_change
+npm run db:check
 ```
 
-## Stack
-
-- Next.js 16 (App Router)
-- React 19
-- TypeScript (strict)
-- Tailwind CSS v4
-- Tanpa dependency UI tambahan (komponen ditulis sendiri)
-
-## Struktur
-
-```
-src/
-├── app/                 # Route (App Router)
-│   ├── dashboard/       # Halaman utama
-│   ├── jobs/            # Daftar job + detail job
-│   ├── clients/ vendors/ crew/ venues/ finance/
-│   ├── layout.tsx       # Application shell
-│   └── globals.css      # Design token
-├── components/
-│   ├── layout/          # Sidebar, Topbar, AppShell
-│   ├── ui/              # Design system reusable
-│   ├── dashboard/       # Komponen khusus dashboard
-│   ├── jobs/            # Tabel job & tab detail job
-│   └── icons.tsx        # Ikon SVG internal
-├── data/mock/           # Mock data (sementara)
-├── lib/                 # Tipe domain, label, util, navigasi
-├── repositories/        # Kontrak repository + implementasi mock & Google
-└── services/            # Logic baca data untuk UI
-```
-
-## Architecture
-
-```
-UI (app/ + components/)
-      ↓
-Service (services/)
-      ↓
-Repository (repositories/)
-      ↓
-Google Sheets  ← sumber data aktif (read + write, via googleRepositories)
-```
-
-UI hanya bergantung pada Service. Service hanya bergantung pada kontrak
-Repository. Sumber data aktif ditentukan di satu tempat:
-`src/repositories/index.ts`.
-
-Untuk mengganti ke Google Sheets cukup menambahkan implementasi repository
-baru dan mengubah fungsi `getRepositories()` — UI tidak perlu diubah.
-
-## Business Rules yang Sudah Dikunci
-
-- Satu Job wajib memiliki **Client ATAU Vendor**, tidak boleh keduanya
-  sekaligus, dan tidak boleh kosong.
-- Status Job hanya: `NOT_STARTED`, `IN_PROGRESS`, `COMPLETED`.
-- Client Payment: Termin 1 = DP, Termin 2, Termin 3 = Pelunasan.
-- Vendor Payment: DP dan Pelunasan.
-- Crew memiliki default payment di master Crew; payment aktual dicatat pada
-  assignment Job-Crew.
-- Delivery memiliki status sendiri (`NOT_STARTED`, `IN_PROGRESS`, `COMPLETED`)
-  dan tidak boleh disamakan dengan status Job.
-
-## Dokumentasi Audit
-
-Lihat [`docs/FREEBUFF_AUDIT.md`](docs/FREEBUFF_AUDIT.md) untuk catatan
-pekerjaan, keputusan teknis, dan hasil validasi.
+PostgreSQL migrations for Supabase live in `drizzle-supabase/`. Historical MySQL
+migrations remain in `drizzle/` for the one-time transition and are not used by
+the runtime.

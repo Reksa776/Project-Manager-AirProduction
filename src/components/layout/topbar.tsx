@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 
+import { logoutAction } from "@/app/actions/auth-actions";
 import { Icon } from "@/components/icons";
 import { NAV_ITEMS } from "@/lib/navigation";
 
@@ -44,6 +45,14 @@ export function Topbar({
           <p className="text-[13px] font-medium text-ink">{adminName}</p>
           <p className="text-[11px] text-ink-muted">Admin</p>
         </div>
+        <form action={logoutAction}>
+          <button
+            type="submit"
+            className="rounded-lg px-2.5 py-2 text-[12px] font-medium text-ink-soft transition-colors hover:bg-brand-soft hover:text-brand sm:px-3 sm:text-[13px]"
+          >
+            Outgoing
+          </button>
+        </form>
       </div>
     </header>
   );

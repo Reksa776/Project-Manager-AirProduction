@@ -1,5 +1,7 @@
 import { pgTable, text, varchar } from "drizzle-orm/pg-core";
 
+import { timestamps } from "./_shared";
+
 /**
  * clients — master client.
  * Field baru sesuai requirement form: company_name, email, client_type

@@ -9,6 +9,7 @@ import {
   EmptyState,
   Input,
   Modal,
+  Select,
   TBody,
   TD,
   TH,
@@ -21,9 +22,13 @@ import type { MasterActionResult } from "@/app/actions/master-actions";
 export interface MasterFieldConfig {
   key: string;
   label: string;
-  type?: "text" | "number" | "textarea";
+  type?: "text" | "number" | "textarea" | "select";
+  /** Opsi untuk `type: "select"` (mis. role crew / jenis client kanonik). */
+  options?: Array<{ value: string; label: string }>;
   required?: boolean;
   hint?: string;
+  /** Nilai awal draft (harus string agar aman dilewatkan from server component). */
+  defaultValue?: string;
 }
 
 export interface MasterCrudProps {
@@ -36,13 +41,14 @@ export interface MasterCrudProps {
   emptyTitle: string;
   emptyDescription: string;
   searchPlaceholder?: string;
+  hideCreate?: boolean;
   createAction: (values: Record<string, string>) => Promise<MasterActionResult>;
   updateAction: (id: string, values: Record<string, string>) => Promise<MasterActionResult>;
   deleteAction: (id: string) => Promise<MasterActionResult>;
 }
 
 function emptyDraft(fields: MasterFieldConfig[]): Record<string, string> {
-  return Object.fromEntries(fields.map((f) => [f.key, ""]));
+  return Object.fromEntries(fields.map((f) => [f.key, f.defaultValue ?? ""]));
 }
 
 export function MasterDataCrud({
@@ -54,6 +60,7 @@ export function MasterDataCrud({
   emptyTitle,
   emptyDescription,
   searchPlaceholder,
+  hideCreate = false,
   createAction,
   updateAction,
   deleteAction,
@@ -123,22 +130,24 @@ export function MasterDataCrud({
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-6 py-4">
-        <div className="min-w-52 flex-1 sm:max-w-xs">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-4 sm:px-6">
+        <div className="w-full min-w-0 flex-1 sm:w-64 sm:max-w-xs">
           <Input
-            placeholder={searchPlaceholder ?? `Cari ${entityLabel.toLowerCase()}...`}
+            placeholder={searchPlaceholder ?? `Search ${entityLabel.toLowerCase()}...`}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            aria-label={`Cari ${entityLabel}`}
+            aria-label={`Search ${entityLabel}`}
           />
         </div>
         <div className="flex items-center gap-3">
           <p className="text-[13px] text-ink-muted">
-            {filteredRows.length} dari {rows.length}
+            {filteredRows.length} from {rows.length}
           </p>
-          <Button size="sm" variant="primary" onClick={openCreate}>
-            Tambah
-          </Button>
+          {!hideCreate ? (
+            <Button size="sm" variant="primary" onClick={openCreate}>
+              Add
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -153,27 +162,27 @@ export function MasterDataCrud({
           icon={icon}
           title={emptyTitle}
           description={emptyDescription}
-          action={
+          action={!hideCreate ? (
             <Button size="sm" variant="secondary" onClick={openCreate}>
-              Tambah {entityLabel}
+              Add {entityLabel}
             </Button>
-          }
+          ) : undefined}
         />
       ) : filteredRows.length === 0 ? (
         <EmptyState
           icon="search"
-          title="Tidak ditemukan"
-          description={`Tidak ada ${entityLabel.toLowerCase()} yang cocok dengan "${query}".`}
+          title="No results found"
+          description={`No ${entityLabel.toLowerCase()} yang cocok dengan "${query}".`}
         />
       ) : (
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <Table>
             <THead>
               <TR>
                 {columns.map((col) => (
                   <TH key={col.key}>{col.label}</TH>
                 ))}
-                <TH>Aksi</TH>
+                <TH>Actions</TH>
               </TR>
             </THead>
             <TBody>
@@ -206,7 +215,7 @@ export function MasterDataCrud({
                         }}
                         disabled={busy}
                       >
-                        Hapus
+                        Delete
                       </button>
                     </div>
                   </TD>
@@ -220,14 +229,14 @@ export function MasterDataCrud({
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editingId ? `Edit ${entityLabel}` : `Tambah ${entityLabel}`}
+        title={editingId ? `Edit ${entityLabel}` : `Add ${entityLabel}`}
         footer={
           <>
             <Button variant="secondary" onClick={() => setModalOpen(false)} disabled={busy}>
-              Batal
+              Cancel
             </Button>
             <Button variant="primary" onClick={handleSubmit} disabled={busy}>
-              {busy ? "Menyimpan..." : "Simpan"}
+              {busy ? "Saving..." : "Save"}
             </Button>
           </>
         }
@@ -239,7 +248,18 @@ export function MasterDataCrud({
             </p>
           ) : null}
           {fields.map((field) =>
-            field.type === "textarea" ? (
+            field.type === "select" ? (
+              <Select
+                key={field.key}
+                label={field.label}
+                options={field.options ?? []}
+                placeholder="-- Select --"
+                value={draft[field.key] ?? ""}
+                onChange={(event) =>
+                  setDraft((prev) => ({ ...prev, [field.key]: event.target.value }))
+                }
+              />
+            ) : field.type === "textarea" ? (
               <div key={field.key} className="flex flex-col gap-1.5">
                 <label className="text-[13px] font-medium text-ink-soft">{field.label}</label>
                 <textarea
@@ -270,15 +290,15 @@ export function MasterDataCrud({
       <Modal
         open={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
-        title={`Hapus ${entityLabel}`}
-        description={`Yakin ingin menghapus "${deleteTarget?.[columns[0].key] ?? ""}"? Tindakan ini tidak dapat dibatalkan.`}
+        title={`Delete ${entityLabel}`}
+        description={`Yakin ingin menghapus "${deleteTarget?.[columns[0].key] ?? ""}"? This action cannot be undone.`}
         footer={
           <>
             <Button variant="secondary" onClick={() => setDeleteTarget(null)} disabled={busy}>
-              Batal
+              Cancel
             </Button>
             <Button variant="danger" onClick={handleConfirmDelete} disabled={busy}>
-              {busy ? "Menghapus..." : "Hapus"}
+              {busy ? "Deleting..." : "Delete"}
             </Button>
           </>
         }

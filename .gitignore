@@ -47,3 +47,11 @@ google-credentials*.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# snapshot migrasi historis (MEMUAT DATA PRIBADI — jangan pernah masuk Git)
+# Ditulis oleh `npm run migration:snapshot -- --write-raw`.
+.migration-snapshots/
+
+# arsip backup database (dump logis; MEMUAT DATA — jangan pernah masuk Git)
+# Ditulis oleh rehearsal backup/restore P0E-2A (scripts/p0e2a-rehearsal.mjs).
+.migration-backups/

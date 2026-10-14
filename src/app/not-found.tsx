@@ -16,14 +16,14 @@ export default function NotFound() {
       <Card>
         <EmptyState
           icon="alert"
-          title="Data tidak ditemukan"
-          description="Periksa kembali tautan atau kembali ke Dashboard untuk melanjutkan pekerjaan."
+          title="Data not found"
+          description="Check the link or return to the dashboard to continue."
           action={
             <Link
               href="/dashboard"
               className="inline-flex h-9 items-center rounded-lg bg-ink px-3.5 text-sm font-medium text-white transition-colors hover:bg-[#2e2e2e]"
             >
-              Kembali ke Dashboard
+              Back ke Dashboard
             </Link>
           }
         />

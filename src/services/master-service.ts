@@ -1,254 +1,164 @@
-import { getRepositories } from "@/repositories";
-import { buildLookup } from "@/services/shared";
 import type {
-  Admin,
-  Client,
-  ClientPayment,
-  Crew,
-  Expense,
-  Vendor,
-  VendorPayment,
-  Venue,
-} from "@/lib/types";
+  CreateClientInput,
+  CreateCrewInput,
+  CreateCrewRoleInput,
+  CreatePackageInput,
+} from "@/domain/inputs";
+import type { Amount } from "@/domain/money";
+import type { Client, Crew, CrewRole, Package, Vendor } from "@/domain/types";
+import { getApplication } from "@/services/runtime";
+import type { CrewDirectoryRow } from "@/services/types";
 
-/** Service untuk data master Client, Vendor, Venue, dan Crew. */
+/**
+ * Service master data KANONIK (Contract v2).
+ *
+ * - Tidak ada Venue (konsep dihapus pada redesain; histori hanya
+ *   `Job.legacyVenueName`).
+ * - Tidak ada Expense (penggantinya Cashflow kanonik).
+ * - Crew memakai `crewRoleId` (role ternormalisasi), bukan string bebas.
+ * - Semua uang memakai `Amount` (string desimal).
+ *
+ * Semua operasi melewati `getApplication()` (batas komposisi tunggal) sehingga
+ * satu-satunya sumber data adalah MySQL kanonik, tanpa fallback Google Sheets.
+ */
+
+/* -------------------------------------------------------------------------- */
+/* Reads                                                                      */
+/* -------------------------------------------------------------------------- */
 
 export async function getClients(): Promise<Client[]> {
-  const clients = await getRepositories().clients.getAll();
-  return [...clients].sort((a, b) => a.name.localeCompare(b.name, "id"));
+  return getApplication().services.master.listClients();
 }
 
 export async function getVendors(): Promise<Vendor[]> {
-  const vendors = await getRepositories().vendors.getAll();
-  return [...vendors].sort((a, b) => a.name.localeCompare(b.name, "id"));
+  return getApplication().services.master.listVendors();
 }
 
-export async function getVenues(): Promise<Venue[]> {
-  const venues = await getRepositories().venues.getAll();
-  return [...venues].sort((a, b) => a.name.localeCompare(b.name, "id"));
+export async function getPackages(activeOnly = false): Promise<Package[]> {
+  const all = await getApplication().services.master.listPackages();
+  return activeOnly ? all.filter((item) => item.isActive) : all;
 }
 
 export async function getCrew(): Promise<Crew[]> {
-  const crew = await getRepositories().crew.getAll();
-  return [...crew].sort((a, b) => a.name.localeCompare(b.name, "id"));
+  return getApplication().services.master.listCrew();
 }
 
-export async function getCurrentAdmin(): Promise<Admin | null> {
-  const admins = await getRepositories().admins.getAll();
-  return admins[0] ?? null;
+export async function getCrewRoles(): Promise<CrewRole[]> {
+  return getApplication().services.master.listCrewRoles();
+}
+
+export async function getCrewDirectory(): Promise<CrewDirectoryRow[]> {
+  return getApplication().services.master.listCrewDirectory();
+}
+
+/**
+ * Admin pertama untuk keperluan tampilan. READ-ONLY dan TIDAK dipakai untuk
+ * otorisasi: autentikasi/otorisasi adalah P1A/P1B. Root layout TIDAK memanggil
+ * fungsi ini (build harus bebas kredensial & bebas baca DB saat prerender).
+ */
+export async function getCurrentAdmin(): Promise<{ id: string; name: string } | null> {
+  const admins = await getApplication().services.adminSessions.listAdmins();
+  const first = admins[0];
+  return first ? { id: first.id, name: first.name } : null;
 }
 
 /* -------------------------------------------------------------------------- */
-/* Master CRUD — validasi business di service, persistence di repository.     */
+/* Input types (presentation-facing, all values are plain form strings)       */
 /* -------------------------------------------------------------------------- */
 
 export interface ClientInput {
   name: string;
-  address?: string;
+  companyName?: string;
+  contactPerson?: string;
   phone?: string;
+  email?: string;
+  address?: string;
+  clientType?: CreateClientInput["clientType"];
   notes?: string;
 }
 
 export interface VendorInput {
   name: string;
+  contactPerson?: string;
   phone?: string;
+  email?: string;
   notes?: string;
 }
 
-export interface VenueInput {
+export interface CrewRoleInput {
   name: string;
-  address?: string;
-  contact?: string;
-  notes?: string;
+  sortOrder?: number;
+  isActive?: boolean;
 }
 
 export interface CrewInput {
   name: string;
-  role: string;
-  defaultPayment: number;
+  crewRoleId: string;
+  defaultPayment: Amount;
   phone?: string;
   notes?: string;
 }
 
-function requireNonEmpty(value: string | undefined, label: string): string {
-  const trimmed = value?.trim();
-  if (!trimmed) {
-    throw new Error(`${label} wajib diisi.`);
-  }
-  return trimmed;
-}
-
-function normalizeOptional(value: string | undefined): string | undefined {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : undefined;
-}
+/* -------------------------------------------------------------------------- */
+/* Writes                                                                     */
+/* -------------------------------------------------------------------------- */
 
 export async function createClient(input: ClientInput): Promise<Client> {
-  return getRepositories().clients.create({
-    name: requireNonEmpty(input.name, "Nama client"),
-    address: normalizeOptional(input.address),
-    phone: normalizeOptional(input.phone),
-    notes: normalizeOptional(input.notes),
-  });
+  return getApplication().services.master.createClient(input);
 }
 
 export async function updateClient(id: string, input: ClientInput): Promise<Client> {
-  return getRepositories().clients.update(id, {
-    name: requireNonEmpty(input.name, "Nama client"),
-    address: normalizeOptional(input.address),
-    phone: normalizeOptional(input.phone),
-    notes: normalizeOptional(input.notes),
-  });
+  return getApplication().services.master.updateClient(id, input);
 }
 
 export async function deleteClient(id: string): Promise<void> {
-  return getRepositories().clients.delete(id);
+  return getApplication().services.master.deleteClient(id);
+}
+
+export async function createPackage(input: CreatePackageInput): Promise<Package> {
+  return getApplication().services.master.createPackage(input);
+}
+
+export async function updatePackage(id: string, input: CreatePackageInput): Promise<Package> {
+  return getApplication().services.master.updatePackage(id, input);
+}
+
+export async function deletePackage(id: string): Promise<void> {
+  return getApplication().services.master.deletePackage(id);
 }
 
 export async function createVendor(input: VendorInput): Promise<Vendor> {
-  return getRepositories().vendors.create({
-    name: requireNonEmpty(input.name, "Nama vendor"),
-    phone: normalizeOptional(input.phone),
-    notes: normalizeOptional(input.notes),
-  });
+  return getApplication().services.master.createVendor(input);
 }
 
 export async function updateVendor(id: string, input: VendorInput): Promise<Vendor> {
-  return getRepositories().vendors.update(id, {
-    name: requireNonEmpty(input.name, "Nama vendor"),
-    phone: normalizeOptional(input.phone),
-    notes: normalizeOptional(input.notes),
-  });
+  return getApplication().services.master.updateVendor(id, input);
 }
 
 export async function deleteVendor(id: string): Promise<void> {
-  return getRepositories().vendors.delete(id);
+  return getApplication().services.master.deleteVendor(id);
 }
 
-export async function createVenue(input: VenueInput): Promise<Venue> {
-  return getRepositories().venues.create({
-    name: requireNonEmpty(input.name, "Nama venue"),
-    address: normalizeOptional(input.address),
-    contact: normalizeOptional(input.contact),
-    notes: normalizeOptional(input.notes),
-  });
+export async function createCrewRole(input: CreateCrewRoleInput): Promise<CrewRole> {
+  return getApplication().services.master.createCrewRole(input);
 }
 
-export async function updateVenue(id: string, input: VenueInput): Promise<Venue> {
-  return getRepositories().venues.update(id, {
-    name: requireNonEmpty(input.name, "Nama venue"),
-    address: normalizeOptional(input.address),
-    contact: normalizeOptional(input.contact),
-    notes: normalizeOptional(input.notes),
-  });
+export async function updateCrewRole(id: string, input: CreateCrewRoleInput): Promise<CrewRole> {
+  return getApplication().services.master.updateCrewRole(id, input);
 }
 
-export async function deleteVenue(id: string): Promise<void> {
-  return getRepositories().venues.delete(id);
+export async function deleteCrewRole(id: string): Promise<void> {
+  return getApplication().services.master.deleteCrewRole(id);
 }
 
-export async function createCrew(input: CrewInput): Promise<Crew> {
-  if (!Number.isFinite(input.defaultPayment) || input.defaultPayment < 0) {
-    throw new Error("Default payment crew harus angka valid (>= 0).");
-  }
-  return getRepositories().crew.create({
-    name: requireNonEmpty(input.name, "Nama crew"),
-    role: requireNonEmpty(input.role, "Role crew"),
-    defaultPayment: input.defaultPayment,
-    phone: normalizeOptional(input.phone),
-    notes: normalizeOptional(input.notes),
-  });
+export async function createCrew(input: CreateCrewInput): Promise<Crew> {
+  return getApplication().services.master.createCrew(input);
 }
 
-export async function updateCrew(id: string, input: CrewInput): Promise<Crew> {
-  if (!Number.isFinite(input.defaultPayment) || input.defaultPayment < 0) {
-    throw new Error("Default payment crew harus angka valid (>= 0).");
-  }
-  return getRepositories().crew.update(id, {
-    name: requireNonEmpty(input.name, "Nama crew"),
-    role: requireNonEmpty(input.role, "Role crew"),
-    defaultPayment: input.defaultPayment,
-    phone: normalizeOptional(input.phone),
-    notes: normalizeOptional(input.notes),
-  });
+export async function updateCrew(id: string, input: CreateCrewInput): Promise<Crew> {
+  return getApplication().services.master.updateCrew(id, input);
 }
 
 export async function deleteCrew(id: string): Promise<void> {
-  return getRepositories().crew.delete(id);
-}
-
-/* -------------------------------------------------------------------------- */
-/* Finance                                                                    */
-/* -------------------------------------------------------------------------- */
-
-export interface ClientPaymentRow extends ClientPayment {
-  jobNumber: string;
-  clientName: string;
-}
-
-export interface VendorPaymentRow extends VendorPayment {
-  jobNumber: string;
-  vendorName: string;
-}
-
-export interface ExpenseRow extends Expense {
-  jobNumber: string;
-}
-
-export interface FinanceOverview {
-  clientPayments: ClientPaymentRow[];
-  vendorPayments: VendorPaymentRow[];
-  expenses: ExpenseRow[];
-}
-
-/** Daftar transaksi finansial lengkap dengan nama Job untuk ditampilkan. */
-export async function getFinanceOverview(): Promise<FinanceOverview> {
-  const repos = getRepositories();
-  const [jobs, clients, vendors, clientPayments, vendorPayments, expenses] =
-    await Promise.all([
-      repos.jobs.getAll(),
-      repos.clients.getAll(),
-      repos.vendors.getAll(),
-      repos.clientPayments.getAll(),
-      repos.vendorPayments.getAll(),
-      repos.expenses.getAll(),
-    ]);
-
-  const jobMap = buildLookup(jobs);
-  const clientMap = buildLookup(clients);
-  const vendorMap = buildLookup(vendors);
-
-  const jobLabel = (jobId: string) => jobMap.get(jobId)?.jobNumber ?? "-";
-  const jobName = (jobId: string) => jobMap.get(jobId)?.jobName ?? "-";
-
-  const paymentRows: ClientPaymentRow[] = clientPayments.map((payment) => {
-    const job = jobMap.get(payment.jobId);
-    const client = job?.clientId ? clientMap.get(job.clientId) : undefined;
-    return {
-      ...payment,
-      jobNumber: jobLabel(payment.jobId),
-      clientName: client?.name ?? jobName(payment.jobId),
-    };
-  });
-
-  const vendorRows: VendorPaymentRow[] = vendorPayments.map((payment) => {
-    const job = jobMap.get(payment.jobId);
-    const vendor = job?.vendorId ? vendorMap.get(job.vendorId) : undefined;
-    return {
-      ...payment,
-      jobNumber: jobLabel(payment.jobId),
-      vendorName: vendor?.name ?? jobName(payment.jobId),
-    };
-  });
-
-  const expenseRows: ExpenseRow[] = expenses.map((expense) => ({
-    ...expense,
-    jobNumber: jobLabel(expense.jobId),
-  }));
-
-  return {
-    clientPayments: paymentRows.sort((a, b) => a.jobNumber.localeCompare(b.jobNumber)),
-    vendorPayments: vendorRows.sort((a, b) => a.jobNumber.localeCompare(b.jobNumber)),
-    expenses: expenseRows.sort((a, b) => b.date.localeCompare(a.date)),
-  };
+  return getApplication().services.master.deleteCrew(id);
 }
