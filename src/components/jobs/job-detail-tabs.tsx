@@ -238,7 +238,7 @@ export function JobDetailTabs({
         <Panel>
           <PanelHeading title="Job Information" />
           <dl className="grid grid-cols-1 gap-x-8 gap-y-6 border-t border-line px-6 py-6 sm:grid-cols-2 lg:grid-cols-4">
-            <DetailItem label="Category" value={JOB_CATEGORY_LABEL[job.category]} />
+            <DetailItem label="Event Date" value={formatShortDate(job.executionDate)} />
             <DetailItem
               label={detail.counterparty.type === "VENDOR" ? "Vendor" : "Client"}
               value={detail.counterparty.name}

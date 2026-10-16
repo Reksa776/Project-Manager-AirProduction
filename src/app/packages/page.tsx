@@ -29,7 +29,7 @@ export default async function PackagesPage() {
       <div className="space-y-6">
         <PageHeader
           title="Packages"
-          description="Manage the package options shown on the public client form."
+          description="Manage the packages available to assign to jobs."
         />
         <MasterDataCrud
           entityLabel="Package"

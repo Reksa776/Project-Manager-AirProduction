@@ -89,30 +89,22 @@ export async function createInitialOwner(input: {
 
   const db = getDb();
   return db.transaction(async (tx) => {
-    const lockRows = await tx.execute(sql`SELECT GET_LOCK('airprod_admin_setup', 10) AS acquired`);
-    const lockResult = lockRows as unknown as [{ acquired?: number }[], unknown];
-    if (Number(lockResult[0]?.[0]?.acquired) !== 1) {
-      throw new Error("Setup akun sedang digunakan. Coba lagi sebentar.");
-    }
+    // PostgreSQL transaction-scoped advisory lock; GET_LOCK/RELEASE_LOCK are MySQL-only.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('airprod_admin_setup'))`);
+    const existing = await tx.select({ id: admins.id }).from(admins).limit(1);
+    if (existing.length) throw new Error("Akun Owner sudah dibuat. Silakan login.");
 
-    try {
-      const existing = await tx.select({ id: admins.id }).from(admins).limit(1);
-      if (existing.length) throw new Error("Akun Owner sudah dibuat. Silakan login.");
-
-      const id = randomUUID();
-      const name = input.name.trim();
-      await tx.insert(admins).values({
-        id,
-        name,
-        email,
-        passwordHash: hashPassword(input.password),
-        role: "OWNER",
-        isActive: true,
-      });
-      return { id, name, email };
-    } finally {
-      await tx.execute(sql`SELECT RELEASE_LOCK('airprod_admin_setup')`);
-    }
+    const id = randomUUID();
+    const name = input.name.trim();
+    await tx.insert(admins).values({
+      id,
+      name,
+      email,
+      passwordHash: hashPassword(input.password),
+      role: "OWNER",
+      isActive: true,
+    });
+    return { id, name, email };
   });
 }
 

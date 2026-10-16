@@ -24,7 +24,7 @@ export function LoginForm() {
         name="password"
         type="password"
         autoComplete="current-password"
-        placeholder="Incomingkan password"
+        placeholder="Enter your password"
         required
         maxLength={128}
       />
@@ -34,7 +34,7 @@ export function LoginForm() {
         </p>
       ) : null}
       <Button type="submit" size="md" className="h-11 w-full !bg-brand hover:!bg-[#8e4051]" disabled={pending}>
-        {pending ? "Memeriksa akses..." : "Incoming ke dashboard"}
+        {pending ? "Signing in..." : "Sign in to dashboard"}
       </Button>
     </form>
   );
