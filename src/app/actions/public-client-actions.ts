@@ -11,7 +11,7 @@ export async function submitPublicClientForm(
 ): Promise<PublicClientFormResult> {
   try {
     if (values.website?.trim()) {
-      return { ok: false, error: "The form could not be submitted. Please try again." };
+      return { ok: false, error: "Formulir tidak dapat dikirim. Silakan coba lagi." };
     }
 
     const name = values.name?.trim() ?? "";
@@ -22,13 +22,13 @@ export async function submitPublicClientForm(
     const notes = values.notes?.trim() ?? "";
 
     if (name.length < 2 || name.length > 120) {
-      return { ok: false, error: "Please enter a name between 2 and 120 characters." };
+      return { ok: false, error: "Nama harus terdiri dari 2 sampai 120 karakter." };
     }
     if (address.length < 3) {
-      return { ok: false, error: "Please enter the event address." };
+      return { ok: false, error: "Silakan isi alamat acara." };
     }
     if (address.length > 500 || notes.length > 5000 || cpw.length > 120 || cpp.length > 120 || phone.length > 120) {
-      return { ok: false, error: "One or more fields exceed the allowed length." };
+      return { ok: false, error: "Satu atau beberapa isian melebihi batas karakter." };
     }
     await createClient({
       name,
@@ -43,6 +43,6 @@ export async function submitPublicClientForm(
     revalidatePath("/dashboard");
     return { ok: true };
   } catch {
-    return { ok: false, error: "We could not save your information. Please try again." };
+    return { ok: false, error: "Data belum dapat disimpan. Silakan coba lagi." };
   }
 }
