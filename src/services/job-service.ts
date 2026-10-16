@@ -6,7 +6,7 @@ import type {
   CreateJobInput,
   CreateVendorPaymentScheduleInput,
 } from "@/domain/inputs";
-import { sumAmounts, type Amount } from "@/domain/money";
+import { addAmounts, subtractAmounts, sumAmounts, type Amount } from "@/domain/money";
 import type {
   Cashflow,
   CashflowCategory,
@@ -21,6 +21,13 @@ import type {
 } from "@/domain/types";
 import { buildLookup, resolveCounterparty } from "@/services/shared";
 import { getApplication } from "@/services/runtime";
+import {
+  listClientsForRequest,
+  listCrewForRequest,
+  listCrewRolesForRequest,
+  listJobsForRequest,
+  listVendorsForRequest,
+} from "@/services/read-cache";
 import type {
   CashflowRowView,
   ClientScheduleView,
@@ -53,18 +60,44 @@ function hasValue(value: string | undefined): value is string {
 }
 
 /** Total kas nyata untuk satu referensi dari daftar kas yang sudah dibaca. */
-function paidForReference(
+function paidAmountsByReference(
   cashflows: readonly Cashflow[],
   referenceType: CashflowReferenceType,
-  referenceId: string,
+): Map<string, Amount> {
+  const totals = new Map<string, Amount>();
+  for (const flow of cashflows) {
+    if (flow.referenceType !== referenceType || !flow.referenceId) continue;
+    totals.set(flow.referenceId, addAmounts(totals.get(flow.referenceId) ?? "0.00", flow.amount));
+  }
+  return totals;
+}
+
+function sumCashflows(
+  cashflows: readonly Cashflow[],
+  matches: (flow: Cashflow) => boolean,
 ): Amount {
-  return sumAmounts(
-    cashflows
-      .filter(
-        (flow) => flow.referenceType === referenceType && flow.referenceId === referenceId,
-      )
-      .map((flow) => flow.amount),
-  );
+  return sumAmounts(cashflows.filter(matches).map((flow) => flow.amount));
+}
+
+function summarizeJobFinancials(
+  cashflows: readonly Cashflow[],
+  clientSchedules: readonly ClientPaymentSchedule[],
+  vendorSchedules: readonly VendorPaymentSchedule[],
+  assignments: readonly JobCrewAssignment[],
+): JobFinancialTotals {
+  const income = sumCashflows(cashflows, (flow) => flow.direction === "INCOME");
+  const expense = sumCashflows(cashflows, (flow) => flow.direction === "EXPENSE");
+  return {
+    income,
+    expense,
+    net: subtractAmounts(income, expense),
+    clientObligation: sumAmounts(clientSchedules.map((schedule) => schedule.amount)),
+    vendorObligation: sumAmounts(vendorSchedules.map((schedule) => schedule.amount)),
+    crewAgreed: sumAmounts(assignments.map((assignment) => assignment.agreedAmount)),
+    clientPaid: sumCashflows(cashflows, (flow) => flow.category === "CLIENT_PAYMENT"),
+    vendorPaid: sumCashflows(cashflows, (flow) => flow.category === "VENDOR_PAYMENT"),
+    crewPaid: sumCashflows(cashflows, (flow) => flow.category === "CREW_PAYMENT"),
+  };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -72,11 +105,10 @@ function paidForReference(
 /* -------------------------------------------------------------------------- */
 
 export async function getJobListItems(): Promise<JobListItem[]> {
-  const app = getApplication();
   const [jobs, clients, vendors] = await Promise.all([
-    app.services.jobs.listJobs(),
-    app.services.master.listClients(),
-    app.services.master.listVendors(),
+    listJobsForRequest(),
+    listClientsForRequest(),
+    listVendorsForRequest(),
   ]);
   const clientMap = buildLookup(clients);
   const vendorMap = buildLookup(vendors);
@@ -107,19 +139,22 @@ export async function getJobDetail(jobNumber: string): Promise<JobDetail | null>
   const job = await app.services.jobs.getJobByNumber(jobNumber);
   if (!job) return null;
 
-  const counterparty = await resolveJobCounterparty(job);
-
-  const [crewList, crewRoles, assignments, deliveries, clientSchedules, vendorSchedules, cashflows, totals] =
+  const [counterparty, crewList, crewRoles, assignments, deliveries, clientSchedules, vendorSchedules, cashflows] =
     await Promise.all([
-      app.services.master.listCrew(),
-      app.services.master.listCrewRoles(),
+      resolveJobCounterparty(job),
+      listCrewForRequest(),
+      listCrewRolesForRequest(),
       app.repositories.jobCrewAssignments.getByJobId(job.id),
       app.services.deliveries.listByJob(job.id),
       app.repositories.clientPaymentSchedules.getByJobId(job.id),
       app.repositories.vendorPaymentSchedules.getByJobId(job.id),
       app.repositories.cashflows.getByJobId(job.id),
-      app.financial.getJobFinancialSummary(job.id),
     ]);
+
+  const totals = summarizeJobFinancials(cashflows, clientSchedules, vendorSchedules, assignments);
+  const crewPaidByAssignment = paidAmountsByReference(cashflows, "job_crew");
+  const clientPaidBySchedule = paidAmountsByReference(cashflows, "client_payment");
+  const vendorPaidBySchedule = paidAmountsByReference(cashflows, "vendor_payment");
 
   const crewMap = buildLookup(crewList);
   const roleMap = buildLookup(crewRoles);
@@ -127,7 +162,7 @@ export async function getJobDetail(jobNumber: string): Promise<JobDetail | null>
     const crew = crewMap.get(assignment.crewId) ?? null;
     const effectiveRoleId = assignment.crewRoleId ?? crew?.crewRoleId ?? null;
     const settlement = deriveSettlement(assignment.agreedAmount, [
-      { amount: paidForReference(cashflows, "job_crew", assignment.id) },
+      { amount: crewPaidByAssignment.get(assignment.id) ?? "0.00" },
     ]);
     return {
       assignment,
@@ -146,10 +181,10 @@ export async function getJobDetail(jobNumber: string): Promise<JobDetail | null>
     crewAssignments,
     deliveries: [...deliveries].sort((a, b) => a.deadline.localeCompare(b.deadline)),
     clientSchedules: clientSchedules
-      .map((schedule) => toClientScheduleView(schedule, cashflows))
+      .map((schedule) => toClientScheduleView(schedule, clientPaidBySchedule.get(schedule.id) ?? "0.00"))
       .sort((a, b) => a.term.localeCompare(b.term)),
     vendorSchedules: vendorSchedules
-      .map((schedule) => toVendorScheduleView(schedule, cashflows))
+      .map((schedule) => toVendorScheduleView(schedule, vendorPaidBySchedule.get(schedule.id) ?? "0.00"))
       .sort((a, b) => a.type.localeCompare(b.type)),
     cashflows: [...cashflows].sort((a, b) => b.occurredOn.localeCompare(a.occurredOn)),
     totals: toTotalsView(totals),
@@ -173,17 +208,15 @@ async function resolveJobCounterparty(job: Job): Promise<Counterparty> {
 
 function toClientScheduleView(
   schedule: ClientPaymentSchedule,
-  cashflows: readonly Cashflow[],
+  paidAmount: Amount,
 ): ClientScheduleView {
-  const paidAmount = paidForReference(cashflows, "client_payment", schedule.id);
   return { ...schedule, paidAmount, status: derivePaymentStatus(schedule.amount, paidAmount) };
 }
 
 function toVendorScheduleView(
   schedule: VendorPaymentSchedule,
-  cashflows: readonly Cashflow[],
+  paidAmount: Amount,
 ): VendorScheduleView {
-  const paidAmount = paidForReference(cashflows, "vendor_payment", schedule.id);
   return { ...schedule, paidAmount, status: derivePaymentStatus(schedule.amount, paidAmount) };
 }
 
@@ -194,13 +227,22 @@ function toTotalsView(totals: JobFinancialTotals): JobFinancialTotals {
 /** Ringkasan finance (+ daftar kas) untuk halaman Finance. */
 export async function getFinanceOverview(): Promise<FinanceOverview> {
   const app = getApplication();
-  const [jobs, clientSchedules, vendorSchedules, cashflows, totals] = await Promise.all([
-    app.services.jobs.listJobs(),
+  const [jobs, clientSchedules, vendorSchedules, cashflows] = await Promise.all([
+    listJobsForRequest(),
     app.repositories.clientPaymentSchedules.getAll(),
     app.repositories.vendorPaymentSchedules.getAll(),
     app.repositories.cashflows.getAll(),
-    app.repositories.cashflows.totals({}),
   ]);
+  const totals = {
+    income: sumCashflows(cashflows, (flow) => flow.direction === "INCOME"),
+    expense: sumCashflows(cashflows, (flow) => flow.direction === "EXPENSE"),
+    net: subtractAmounts(
+      sumCashflows(cashflows, (flow) => flow.direction === "INCOME"),
+      sumCashflows(cashflows, (flow) => flow.direction === "EXPENSE"),
+    ),
+  };
+  const clientPaidBySchedule = paidAmountsByReference(cashflows, "client_payment");
+  const vendorPaidBySchedule = paidAmountsByReference(cashflows, "vendor_payment");
 
   const jobMap = buildLookup(jobs);
   const jobLabel = (jobId: string | undefined): string => {
@@ -224,10 +266,10 @@ export async function getFinanceOverview(): Promise<FinanceOverview> {
 
   return {
     clientSchedules: clientSchedules
-      .map((schedule) => toClientScheduleView(schedule, cashflows))
+      .map((schedule) => toClientScheduleView(schedule, clientPaidBySchedule.get(schedule.id) ?? "0.00"))
       .sort((a, b) => jobNumber(a.jobId).localeCompare(jobNumber(b.jobId))),
     vendorSchedules: vendorSchedules
-      .map((schedule) => toVendorScheduleView(schedule, cashflows))
+      .map((schedule) => toVendorScheduleView(schedule, vendorPaidBySchedule.get(schedule.id) ?? "0.00"))
       .sort((a, b) => jobNumber(a.jobId).localeCompare(jobNumber(b.jobId))),
     cashflows: cashflowRows,
     totals,

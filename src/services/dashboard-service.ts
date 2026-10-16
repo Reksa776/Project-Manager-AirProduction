@@ -1,5 +1,10 @@
 import type { Job } from "@/domain/types";
-import { getApplication } from "@/services/runtime";
+import {
+  listClientsForRequest,
+  listDeliveriesForRequest,
+  listJobsForRequest,
+  listVendorsForRequest,
+} from "@/services/read-cache";
 import { buildLookup, resolveCounterparty } from "@/services/shared";
 import type {
   DashboardData,
@@ -29,12 +34,11 @@ function today(): string {
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
-  const app = getApplication();
   const [jobs, clients, vendors, deliveries] = await Promise.all([
-    app.services.jobs.listJobs(),
-    app.services.master.listClients(),
-    app.services.master.listVendors(),
-    app.services.deliveries.listDeliveries(),
+    listJobsForRequest(),
+    listClientsForRequest(),
+    listVendorsForRequest(),
+    listDeliveriesForRequest(),
   ]);
 
   const clientMap = buildLookup(clients);

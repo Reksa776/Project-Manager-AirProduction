@@ -7,6 +7,13 @@ import type {
 import type { Amount } from "@/domain/money";
 import type { Client, Crew, CrewRole, Package, Vendor } from "@/domain/types";
 import { getApplication } from "@/services/runtime";
+import {
+  listClientsForRequest,
+  listCrewForRequest,
+  listCrewRolesForRequest,
+  listPackagesForRequest,
+  listVendorsForRequest,
+} from "@/services/read-cache";
 import type { CrewDirectoryRow } from "@/services/types";
 
 /**
@@ -27,28 +34,30 @@ import type { CrewDirectoryRow } from "@/services/types";
 /* -------------------------------------------------------------------------- */
 
 export async function getClients(): Promise<Client[]> {
-  return getApplication().services.master.listClients();
+  return listClientsForRequest();
 }
 
 export async function getVendors(): Promise<Vendor[]> {
-  return getApplication().services.master.listVendors();
+  return listVendorsForRequest();
 }
 
 export async function getPackages(activeOnly = false): Promise<Package[]> {
-  const all = await getApplication().services.master.listPackages();
+  const all = await listPackagesForRequest();
   return activeOnly ? all.filter((item) => item.isActive) : all;
 }
 
 export async function getCrew(): Promise<Crew[]> {
-  return getApplication().services.master.listCrew();
+  return listCrewForRequest();
 }
 
 export async function getCrewRoles(): Promise<CrewRole[]> {
-  return getApplication().services.master.listCrewRoles();
+  return listCrewRolesForRequest();
 }
 
 export async function getCrewDirectory(): Promise<CrewDirectoryRow[]> {
-  return getApplication().services.master.listCrewDirectory();
+  const [members, roles] = await Promise.all([listCrewForRequest(), listCrewRolesForRequest()]);
+  const rolesById = new Map(roles.map((role) => [role.id, role]));
+  return members.map((crew) => ({ crew, role: rolesById.get(crew.crewRoleId) ?? null }));
 }
 
 /**
