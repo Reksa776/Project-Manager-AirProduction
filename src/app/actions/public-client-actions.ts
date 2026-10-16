@@ -15,6 +15,9 @@ export async function submitPublicClientForm(
     }
 
     const name = values.name?.trim() ?? "";
+    const cpw = values.cpw?.trim() ?? "";
+    const cpp = values.cpp?.trim() ?? "";
+    const phone = values.phone?.trim() ?? "";
     const address = values.address?.trim() ?? "";
     const notes = values.notes?.trim() ?? "";
 
@@ -24,11 +27,14 @@ export async function submitPublicClientForm(
     if (address.length < 3) {
       return { ok: false, error: "Please enter the event address." };
     }
-    if (address.length > 500 || notes.length > 5000) {
+    if (address.length > 500 || notes.length > 5000 || cpw.length > 120 || cpp.length > 120 || phone.length > 120) {
       return { ok: false, error: "One or more fields exceed the allowed length." };
     }
     await createClient({
       name,
+      cpw: cpw || undefined,
+      cpp: cpp || undefined,
+      phone: phone || undefined,
       address: address || undefined,
       notes: notes || undefined,
     });

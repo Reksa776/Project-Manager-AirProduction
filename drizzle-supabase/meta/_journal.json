@@ -8,6 +8,13 @@
       "when": 1792000392198,
       "tag": "0000_initial_supabase_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792159045053,
+      "tag": "0001_add_client_cpw_cpp",
+      "breakpoints": true
     }
   ]
 }

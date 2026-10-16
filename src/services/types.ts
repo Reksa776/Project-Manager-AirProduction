@@ -119,7 +119,7 @@ export interface IncomingWeddingItem {
   status: JobStatus;
 }
 
-export interface IncomingEditingItem {
+export interface ProjectMonitoringItem {
   deliveryId: string;
   deliveryName: string;
   jobNumber: string;
@@ -128,10 +128,15 @@ export interface IncomingEditingItem {
   status: DeliveryStatus;
 }
 
+/** @deprecated Kept as an alias for existing consumers of the dashboard data. */
+export type IncomingEditingItem = ProjectMonitoringItem;
+
 export interface DashboardData {
   summary: DashboardSummary;
   incomingWeddings: IncomingWeddingItem[];
-  incomingEditing: IncomingEditingItem[];
+  projectMonitoring: ProjectMonitoringItem[];
+  /** @deprecated Use projectMonitoring. */
+  incomingEditing: ProjectMonitoringItem[];
 }
 
 /* -------------------------------------------------------------------------- */

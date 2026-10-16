@@ -103,6 +103,7 @@ export default async function FinancePage() {
       <PageHeader
         title="Finance"
         description="Billing schedules and actual cash movements. Payment status is calculated from recorded cash, not stored separately."
+        actions={<a href="/api/reports/finance" className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#1a73e8] px-3 text-sm font-medium text-[#1967d2] transition-colors hover:bg-[#e8f0fe]"><span aria-hidden="true">↓</span> Download Excel</a>}
       />
 
       {/* Obligations: schedules (create + update; canonical has no schedule delete) */}

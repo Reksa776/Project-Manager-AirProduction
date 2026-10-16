@@ -88,6 +88,8 @@ export interface CrewRole {
 export interface Client {
   id: string;
   name: string;
+  cpw?: string;
+  cpp?: string;
   companyName?: string;
   contactPerson?: string;
   phone?: string;

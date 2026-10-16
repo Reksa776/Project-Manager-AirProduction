@@ -51,10 +51,13 @@ export default async function ClientsPage() {
             />
           ) : (
             <div className="min-w-0 max-w-full overflow-x-auto">
-              <Table className="min-w-[900px]">
+              <Table className="min-w-[1100px]">
                 <THead>
                   <TR>
                     <TH>Client</TH>
+                    <TH>CPW</TH>
+                    <TH>CPP</TH>
+                    <TH>Mobile Number</TH>
                     <TH>Event Address</TH>
                     <TH>Notes</TH>
                   </TR>
@@ -65,6 +68,9 @@ export default async function ClientsPage() {
                       <TD className="max-w-56 break-words font-medium text-ink">
                         {client.name}
                       </TD>
+                      <TD className="max-w-48 break-words">{client.cpw ?? "-"}</TD>
+                      <TD className="max-w-48 break-words">{client.cpp ?? "-"}</TD>
+                      <TD className="max-w-40 break-words">{client.phone ?? "-"}</TD>
                       <TD className="max-w-56 break-words">{client.address ?? "-"}</TD>
                       <TD className="max-w-72 whitespace-pre-wrap break-words">{client.notes ?? "-"}</TD>
                     </TR>

@@ -74,6 +74,8 @@ async function createClient(db: Database, data: CreateClientInput): Promise<Clie
   await db.insert(clients).values({
     id,
     name,
+    cpw: optionalText(data.cpw),
+    cpp: optionalText(data.cpp),
     companyName: optionalText(data.companyName),
     contactPerson: optionalText(data.contactPerson),
     phone: optionalText(data.phone),
@@ -99,6 +101,8 @@ async function updateClient(
     .update(clients)
     .set({
       name,
+      cpw: optionalText(data.cpw),
+      cpp: optionalText(data.cpp),
       companyName: optionalText(data.companyName),
       contactPerson: optionalText(data.contactPerson),
       phone: optionalText(data.phone),

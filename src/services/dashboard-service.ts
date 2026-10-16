@@ -4,7 +4,7 @@ import { buildLookup, resolveCounterparty } from "@/services/shared";
 import type {
   DashboardData,
   DashboardSummary,
-  IncomingEditingItem,
+  ProjectMonitoringItem,
   IncomingWeddingItem,
 } from "@/services/types";
 
@@ -13,7 +13,8 @@ import type {
  *
  * - `incomingWeddings` diturunkan dari `jobs.executionDate` (kategori WEDDING
  *   yang belum lewat), diurutkan dari tanggal terdekat.
- * - `incomingEditing` diturunkan dari `deliveries.deadline` (belum selesai).
+ * - `projectMonitoring` menampilkan semua deliverable dari seluruh job,
+ *   termasuk yang selesai, agar progres proyek bisa dipantau end-to-end.
  * - Venue TIDAK dibaca (venue bukan entity aktif; hanya `legacyVenueName`
  *   ditampilkan sebagai snapshot histori bila ada).
  * - Database kosong menghasilkan ringkasan nol dan daftar kosong (bukan data
@@ -63,8 +64,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       status: job.status,
     }));
 
-  const incomingEditing: IncomingEditingItem[] = deliveries
-    .filter((delivery) => delivery.status !== "COMPLETED")
+  const projectMonitoring: ProjectMonitoringItem[] = deliveries
     .sort((a, b) => a.deadline.localeCompare(b.deadline))
     .map((delivery) => {
       const job = jobMap.get(delivery.jobId);
@@ -78,5 +78,10 @@ export async function getDashboardData(): Promise<DashboardData> {
       };
     });
 
-  return { summary, incomingWeddings, incomingEditing };
+  return {
+    summary,
+    incomingWeddings,
+    projectMonitoring,
+    incomingEditing: projectMonitoring,
+  };
 }

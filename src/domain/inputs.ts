@@ -19,6 +19,8 @@ import type {
 
 export interface CreateClientInput {
   name: string;
+  cpw?: string;
+  cpp?: string;
   companyName?: string;
   contactPerson?: string;
   phone?: string;

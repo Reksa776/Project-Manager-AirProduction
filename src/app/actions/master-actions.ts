@@ -67,6 +67,8 @@ function clientInputFrom(values: Record<string, string>) {
   }
   return {
     name: requireText(values, "name", "Client name"),
+    cpw: optionalText(values, "cpw"),
+    cpp: optionalText(values, "cpp"),
     companyName: optionalText(values, "companyName"),
     contactPerson: optionalText(values, "contactPerson"),
     phone: optionalText(values, "phone"),

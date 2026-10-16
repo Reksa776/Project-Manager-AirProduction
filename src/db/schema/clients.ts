@@ -11,6 +11,8 @@ import { timestamps } from "./_shared";
 export const clients = pgTable("clients", {
   id: varchar("id", { length: 36 }).primaryKey(),
   name: varchar("name", { length: 120 }).notNull(),
+  cpw: varchar("cpw", { length: 120 }),
+  cpp: varchar("cpp", { length: 120 }),
   companyName: varchar("company_name", { length: 120 }),
   contactPerson: varchar("contact_person", { length: 120 }),
   phone: varchar("phone", { length: 120 }),

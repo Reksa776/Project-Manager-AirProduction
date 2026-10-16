@@ -24,13 +24,13 @@ export const metadata = {
   title: "Dashboard · Air Production DB",
 };
 
-// Data dibaca from MySQL saat runtime — JANGAN diprerender statis (build harus
+// Data dibaca dari database saat runtime — jangan diprerender statis (build harus
 // bebas kredensial eksternal dan bebas koneksi database).
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const admin = await requireAuthenticatedAdmin();
-  const { summary, incomingWeddings, incomingEditing } =
+  const { summary, incomingWeddings, projectMonitoring } =
     await getDashboardData();
 
   return (
@@ -130,45 +130,43 @@ export default async function DashboardPage() {
 
         <Card>
           <CardHeader
-            title="Editing and Deliverables"
-            description="Incomplete deliverables, sorted by the nearest deadline."
+          title="Project Monitoring"
+          description="Track deliverable progress and deadlines across all projects."
           />
-          {incomingEditing.length === 0 ? (
+          {projectMonitoring.length === 0 ? (
             <EmptyState
               icon="film"
-              title="No edits waiting"
-              description="All deliverables are complete. New work will appear here with its deadline."
+              title="No project activity yet"
+              description="Add deliverables to jobs to monitor project progress here."
             />
           ) : (
             <Table>
               <THead>
                 <TR>
-                  <TH>Deadline</TH>
+                  <TH>Project</TH>
                   <TH>Delivery</TH>
+                  <TH>Deadline</TH>
                   <TH>Status</TH>
                 </TR>
               </THead>
               <TBody>
-                {incomingEditing.map((item) => (
+                {projectMonitoring.map((item) => (
                   <TR key={item.deliveryId}>
-                    <TD className="whitespace-nowrap">
-                      <span className="font-medium text-ink">
-                        {formatShortDate(item.deadline)}
-                      </span>
-                      <span className="ml-1.5 text-[12px] text-ink-muted">
-                        {formatCountdown(item.deadline)}
-                      </span>
-                    </TD>
                     <TD>
                       <Link
                         href={`/jobs/${item.jobNumber}`}
                         className="font-medium text-ink hover:text-brand hover:underline"
                       >
-                        {item.deliveryName}
+                        {item.jobName}
                       </Link>
                       <p className="mt-0.5 text-[12px] text-ink-muted">
-                        {item.jobName}
+                        {item.jobNumber}
                       </p>
+                    </TD>
+                    <TD className="max-w-56 break-words">{item.deliveryName}</TD>
+                    <TD className="whitespace-nowrap">
+                      <span className="font-medium text-ink">{formatShortDate(item.deadline)}</span>
+                      <span className="ml-1.5 text-[12px] text-ink-muted">{formatCountdown(item.deadline)}</span>
                     </TD>
                     <TD>
                       <DeliveryStatusBadge status={item.status} />

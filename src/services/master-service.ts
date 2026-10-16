@@ -68,6 +68,8 @@ export async function getCurrentAdmin(): Promise<{ id: string; name: string } | 
 
 export interface ClientInput {
   name: string;
+  cpw?: string;
+  cpp?: string;
   companyName?: string;
   contactPerson?: string;
   phone?: string;

@@ -74,6 +74,8 @@ export function rowToCanonicalClient(row: ClientRow): Client {
   return {
     id: row.id,
     name: row.name,
+    cpw: opt(row.cpw),
+    cpp: opt(row.cpp),
     companyName: opt(row.companyName),
     contactPerson: opt(row.contactPerson),
     phone: opt(row.phone),
