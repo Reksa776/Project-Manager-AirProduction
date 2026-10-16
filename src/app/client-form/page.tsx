@@ -12,14 +12,14 @@ export const dynamic = "force-dynamic";
 
 export default async function PublicClientFormPage() {
   return (
-    <main className="min-h-screen bg-[#f6f8fb] px-4 py-8 text-[#17212f] sm:px-6 sm:py-12">
-      <div className="mx-auto max-w-[680px]">
-        <div className="mb-5 flex items-center justify-between border-b border-[#e5e9ef] pb-4">
-          <p className="text-sm font-semibold tracking-[-0.01em] text-[#26364a]">Air Production</p>
-          <p className="text-xs text-[#778397]">Wedding &amp; Event Organizer</p>
+    <main className="min-h-screen w-full bg-[#f6f8fb] px-3 py-6 text-[#17212f] sm:px-6 sm:py-12">
+      <div className="mx-auto w-full min-w-0 max-w-[680px]">
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[#e5e9ef] pb-3 sm:mb-5 sm:justify-between sm:pb-4">
+          <p className="text-[13px] font-semibold tracking-[-0.01em] text-[#26364a] sm:text-sm">Air Production</p>
+          <p className="ml-auto text-right text-[11px] text-[#778397] sm:ml-0 sm:text-xs">Wedding &amp; Event Organizer</p>
           </div>
         <ClientIntakeForm createAction={submitPublicClientForm} />
-        <p className="mt-5 px-3 text-center text-xs leading-5 text-[#778397]">
+        <p className="mt-5 px-2 text-center text-[11px] leading-5 text-[#778397] sm:px-3 sm:text-xs">
           Your information will be used by the Air Production team to follow up on your event.
         </p>
         <div className="mt-3 text-center">

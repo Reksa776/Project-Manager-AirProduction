@@ -35,22 +35,22 @@ export function ClientIntakeForm({
   }
 
   return (
-    <div>
+    <div className="w-full min-w-0">
       <Card className="overflow-hidden rounded-xl border border-[#e1e5eb] shadow-[0_2px_8px_rgba(20,35,55,0.04)]">
         <div className="h-1 bg-[#3978c5]" />
-        <div className="px-6 py-7 sm:px-9">
+        <div className="min-w-0 px-4 py-5 sm:px-9 sm:py-7">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#3978c5]">Air Production</p>
-          <h1 className="mt-3 text-2xl font-semibold tracking-[-0.025em] text-[#17212f]">Client information</h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-[#657184]">Tell us a little about you and your event. Our team will follow up using the details below.</p>
+          <h1 className="mt-3 break-words text-xl font-semibold tracking-[-0.02em] text-[#17212f] sm:text-2xl">Client information</h1>
+          <p className="mt-2 max-w-xl text-[13px] leading-5 text-[#657184] sm:text-sm sm:leading-6">Tell us a little about you and your event. Our team will follow up using the details below.</p>
           <p className="mt-5 border-t border-[#edf0f4] pt-3 text-xs text-[#738096]"><span className="text-[#3978c5]">*</span> Required</p>
         </div>
       </Card>
       <form onSubmit={handleSubmit} className="mt-3 space-y-3">
-        <div className="absolute -left-[10000px] h-px w-px overflow-hidden" aria-hidden="true">
+        <div className="sr-only" aria-hidden="true">
           <label htmlFor="client-website">Leave this field empty</label>
           <input id="client-website" name="website" tabIndex={-1} autoComplete="off" />
         </div>
-        <Card className="space-y-6 rounded-xl border border-[#e1e5eb] p-6 shadow-[0_2px_8px_rgba(20,35,55,0.04)] sm:p-8">
+        <Card className="min-w-0 space-y-5 rounded-xl border border-[#e1e5eb] p-4 shadow-[0_2px_8px_rgba(20,35,55,0.04)] sm:space-y-6 sm:p-8">
           <div>
             <h2 className="text-sm font-semibold text-[#17212f]">Your details</h2>
             <p className="mt-1 text-xs leading-5 text-[#738096]">Contact information for the couple and primary contact.</p>
@@ -63,7 +63,7 @@ export function ClientIntakeForm({
           <Input label="Mobile number" name="phone" type="tel" autoComplete="tel" maxLength={120} className="border-[#d9dfe8] focus:border-[#3978c5] focus:ring-[#3978c5]/10" />
         </Card>
 
-        <Card className="space-y-6 rounded-xl border border-[#e1e5eb] p-6 shadow-[0_2px_8px_rgba(20,35,55,0.04)] sm:p-8">
+        <Card className="min-w-0 space-y-5 rounded-xl border border-[#e1e5eb] p-4 shadow-[0_2px_8px_rgba(20,35,55,0.04)] sm:space-y-6 sm:p-8">
           <div>
             <h2 className="text-sm font-semibold text-[#17212f]">Event details</h2>
             <p className="mt-1 text-xs leading-5 text-[#738096]">Where should our team plan to meet you?</p>
@@ -97,11 +97,11 @@ export function ClientIntakeForm({
           </div>
         ) : null}
 
-        <div className="flex items-center justify-between border-t border-[#e8ecf1] pt-4">
-          <Button type="submit" disabled={busy} className="rounded-lg bg-[#3978c5] px-5 text-white hover:bg-[#2f68ad]">
+        <div className="flex min-w-0 flex-col-reverse items-start gap-3 border-t border-[#e8ecf1] pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <Button type="submit" disabled={busy} className="max-w-full rounded-lg bg-[#3978c5] px-5 text-white hover:bg-[#2f68ad]">
             {busy ? "Sending..." : "Submit information"}
           </Button>
-          <span className="text-xs text-[#738096]">Your details are shared with our team only.</span>
+          <span className="max-w-full break-words text-xs leading-5 text-[#738096] sm:text-right">Your details are shared with our team only.</span>
         </div>
       </form>
     </div>
