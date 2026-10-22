@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/ui";
 import { AppShell } from "@/components/layout/app-shell";
 import { FinanceCrud } from "@/components/finance/finance-crud";
+import { ReceivableSummary, type ReceivableSummaryData } from "@/components/finance/receivable-summary";
 import {
   CASHFLOW_CATEGORY_LABEL,
   CASHFLOW_DIRECTION_LABEL,
@@ -20,6 +21,8 @@ import {
 } from "@/app/actions/finance-actions";
 import { getJobListItems, getFinanceOverview } from "@/services/job-service";
 import { formatCurrency } from "@/lib/utils";
+import { sumAmounts, subtractAmounts } from "@/domain/money";
+import type { ClientScheduleView, VendorScheduleView } from "@/services/types";
 import { requireAuthenticatedAdmin } from "@/lib/auth";
 
 export const metadata = {
@@ -41,6 +44,34 @@ const EXPENSE_CATEGORY_OPTIONS = GENERAL_EXPENSE_CATEGORIES.map((value) => ({
   value,
   label: CASHFLOW_CATEGORY_LABEL[value],
 }));
+
+function jakartaToday(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function buildPaymentSummary(
+  schedules: Array<ClientScheduleView | VendorScheduleView>,
+): ReceivableSummaryData {
+  const today = jakartaToday();
+  const outstandingAmounts = schedules.map((schedule) => {
+    const remaining = subtractAmounts(schedule.amount, schedule.paidAmount);
+    return remaining.startsWith("-") ? "0.00" : remaining;
+  });
+
+  return {
+    outstanding: sumAmounts(outstandingAmounts),
+    unpaid: schedules.filter((schedule) => schedule.status === "UNPAID").length,
+    partiallyPaid: schedules.filter((schedule) => schedule.status === "PARTIAL").length,
+    overdue: schedules.filter(
+      (schedule) => schedule.status !== "PAID" && Boolean(schedule.dueDate) && schedule.dueDate! < today,
+    ).length,
+  };
+}
 
 export default async function FinancePage() {
   const admin = await requireAuthenticatedAdmin();
@@ -104,6 +135,11 @@ export default async function FinancePage() {
         title="Finance"
         description="Billing schedules and actual cash movements. Payment status is calculated from recorded cash, not stored separately."
         actions={<a href="/api/reports/finance" className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#1a73e8] px-3 text-sm font-medium text-[#1967d2] transition-colors hover:bg-[#e8f0fe]"><span aria-hidden="true">↓</span> Download Excel</a>}
+      />
+
+      <ReceivableSummary
+        receivables={buildPaymentSummary(overview.clientSchedules)}
+        payables={buildPaymentSummary(overview.vendorSchedules)}
       />
 
       {/* Obligations: schedules (create + update; canonical has no schedule delete) */}
