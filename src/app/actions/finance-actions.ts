@@ -19,7 +19,7 @@ import { assertAuthenticatedAdmin } from "@/lib/auth";
 
 export type FinanceActionResult = { ok: true } | { ok: false; error: string };
 
-const GENERAL_EXPENSE_CATEGORIES = ["TRANSPORT", "EQUIPMENT", "OTHER"] as const;
+const GENERAL_EXPENSE_CATEGORIES = ["INTERNET", "ELECTRICITY", "SALARY", "RENT", "EQUIPMENT", "SUPPLIES"] as const;
 type GeneralExpenseCategory = (typeof GENERAL_EXPENSE_CATEGORIES)[number];
 
 function errorMessage(error: unknown): string {
@@ -200,7 +200,7 @@ export async function recordExpenseAction(
   return run(async () => {
     const category = values.category?.trim() as GeneralExpenseCategory;
     if (!GENERAL_EXPENSE_CATEGORIES.includes(category)) {
-      throw new Error("Invalid expense category (TRANSPORT, EQUIPMENT, OTHER).");
+      throw new Error("Kategori expense tidak valid.");
     }
     const description = values.description?.trim();
     if (!description) throw new Error("Description biaya is required diisi.");

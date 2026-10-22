@@ -431,7 +431,7 @@ export interface RecordCrewPaymentInput {
 
 export interface RecordExpenseInput {
   jobId?: string;
-  category: Extract<CashflowCategory, "TRANSPORT" | "EQUIPMENT" | "OTHER">;
+  category: Extract<CashflowCategory, "TRANSPORT" | "OTHER" | "INTERNET" | "ELECTRICITY" | "SALARY" | "RENT" | "EQUIPMENT" | "SUPPLIES">;
   amount: Amount;
   occurredOn: string;
   description: string;

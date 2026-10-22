@@ -53,6 +53,11 @@ export const CASHFLOW_CATEGORIES = [
   "TRANSPORT",
   "EQUIPMENT",
   "OTHER",
+  "INTERNET",
+  "ELECTRICITY",
+  "SALARY",
+  "RENT",
+  "SUPPLIES",
 ] as const;
 export type CashflowCategory = (typeof CASHFLOW_CATEGORIES)[number];
 

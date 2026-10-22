@@ -15,6 +15,13 @@
       "when": 1792159045053,
       "tag": "0001_add_client_cpw_cpp",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792676929084,
+      "tag": "0002_expense_categories",
+      "breakpoints": true
     }
   ]
 }

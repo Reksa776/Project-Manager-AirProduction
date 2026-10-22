@@ -670,7 +670,7 @@ export function JobDetailTabs({
               </p>
             </div>
             <Button size="sm" variant="primary" onClick={() => {
-              setExpenseDraft({ category: "OTHER", description: "", amount: "", occurredOn: "", idempotencyKey: newIdempotencyKey() });
+              setExpenseDraft({ category: "INTERNET", description: "", amount: "", occurredOn: "", idempotencyKey: newIdempotencyKey() });
               setExpenseOpen(true);
             }}>
               Record Expense
@@ -971,7 +971,7 @@ export function JobDetailTabs({
         }
       >
         <div className="space-y-4">
-          <Select label="Category" options={expenseCategoryOptions} value={expenseDraft.category ?? "OTHER"} onChange={(e) => setExpenseDraft((p) => ({ ...p, category: e.target.value }))} />
+          <Select label="Kategori" options={expenseCategoryOptions} value={expenseDraft.category ?? "INTERNET"} onChange={(e) => setExpenseDraft((p) => ({ ...p, category: e.target.value }))} />
           <Input label="Description" value={expenseDraft.description ?? ""} onChange={(e) => setExpenseDraft((p) => ({ ...p, description: e.target.value }))} />
           <Input label="Amount" hint="Contoh: 250000" inputMode="numeric" value={expenseDraft.amount ?? ""} onChange={(e) => setExpenseDraft((p) => ({ ...p, amount: e.target.value }))} />
           <Input label="Expense Date" type="date" value={expenseDraft.occurredOn ?? ""} onChange={(e) => setExpenseDraft((p) => ({ ...p, occurredOn: e.target.value }))} />

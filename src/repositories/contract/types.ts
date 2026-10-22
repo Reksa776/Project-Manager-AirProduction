@@ -167,7 +167,7 @@ export interface RecordCrewPaymentInput extends IdempotencyRequirement {
 export interface RecordGeneralExpenseInput extends IdempotencyRequirement {
   /** Kosong = biaya operasional tanpa Job (P0C-2: `cashflows.job_id` nullable). */
   jobId?: string;
-  category: "TRANSPORT" | "EQUIPMENT" | "OTHER";
+  category: "TRANSPORT" | "EQUIPMENT" | "OTHER" | "INTERNET" | "ELECTRICITY" | "SALARY" | "RENT" | "SUPPLIES";
   amount: Amount;
   occurredOn: string;
   description: string;

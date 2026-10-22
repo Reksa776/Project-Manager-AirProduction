@@ -167,6 +167,11 @@ const EXPENSE_CATEGORIES: readonly CashflowCategory[] = [
   "TRANSPORT",
   "EQUIPMENT",
   "OTHER",
+  "INTERNET",
+  "ELECTRICITY",
+  "SALARY",
+  "RENT",
+  "SUPPLIES",
 ];
 
 /** Validasi invariant cashflow tanpa menyentuh DB. */

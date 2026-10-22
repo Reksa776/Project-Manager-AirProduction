@@ -198,16 +198,16 @@ export default async function FinancePage() {
 
       <FinanceCrud
         title="Operating Expenses"
-        description="Record operating expenses. Linking an expense to a job is optional."
+        description="Catat beban (internet, listrik, gaji, sewa), peralatan, dan perlengkapan. Job bersifat opsional."
         entityLabel="Expense"
         columns={[{ key: "occurredOn", label: "Date" }]}
         rows={[]}
         fields={[
           { key: "jobId", label: "Job (optional)", type: "select", options: [{ value: "", label: "-- Tanpa Job --" }, ...jobOptions] },
-          { key: "category", label: "Category", type: "select", options: EXPENSE_CATEGORY_OPTIONS, defaultValue: "OTHER" },
-          { key: "description", label: "Description" },
-          { key: "amount", label: "Amount", type: "number", hint: "Contoh: 250000" },
-          { key: "occurredOn", label: "Date", type: "date" },
+          { key: "category", label: "Kategori", type: "select", options: EXPENSE_CATEGORY_OPTIONS, defaultValue: "INTERNET" },
+          { key: "description", label: "Keterangan" },
+          { key: "amount", label: "Nominal", type: "number", hint: "Contoh: 250000" },
+          { key: "occurredOn", label: "Tanggal", type: "date" },
           { key: "idempotencyKey", label: "Idempotency Key", type: "hidden", autoKey: true },
         ]}
         createAction={recordExpenseAction}

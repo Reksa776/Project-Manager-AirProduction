@@ -72,12 +72,12 @@ export const cashflows = pgTable(
     ),
     chkCategory: check(
       "chk_cashflows_category",
-      sql`category in ('CLIENT_PAYMENT', 'CREW_PAYMENT', 'VENDOR_PAYMENT', 'TRANSPORT', 'EQUIPMENT', 'OTHER')`,
+      sql`category in ('CLIENT_PAYMENT', 'CREW_PAYMENT', 'VENDOR_PAYMENT', 'TRANSPORT', 'EQUIPMENT', 'OTHER', 'INTERNET', 'ELECTRICITY', 'SALARY', 'RENT', 'SUPPLIES')`,
     ),
     chkDirectionCategory: check(
       "chk_cashflows_direction_category",
       sql`(direction = 'INCOME' and category = 'CLIENT_PAYMENT')
-          or (direction = 'EXPENSE' and category in ('CREW_PAYMENT', 'VENDOR_PAYMENT', 'TRANSPORT', 'EQUIPMENT', 'OTHER'))`,
+          or (direction = 'EXPENSE' and category in ('CREW_PAYMENT', 'VENDOR_PAYMENT', 'TRANSPORT', 'EQUIPMENT', 'OTHER', 'INTERNET', 'ELECTRICITY', 'SALARY', 'RENT', 'SUPPLIES'))`,
     ),
     chkReference: check(
       "chk_cashflows_reference",

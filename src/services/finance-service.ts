@@ -74,6 +74,11 @@ const GENERAL_EXPENSE_CATEGORIES: readonly CashflowCategory[] = [
   "TRANSPORT",
   "EQUIPMENT",
   "OTHER",
+  "INTERNET",
+  "ELECTRICITY",
+  "SALARY",
+  "RENT",
+  "SUPPLIES",
 ];
 
 export interface CrewSettlement {
@@ -238,7 +243,7 @@ export function createFinancialService(resolveDb: () => Database) {
     const key = requireIdempotencyKey(input.idempotencyKey);
     if (!GENERAL_EXPENSE_CATEGORIES.includes(input.category)) {
       throw new RepositoryError(
-        `Kategori biaya operasional tidak valid: '${input.category}'. Pilihan: TRANSPORT, EQUIPMENT, OTHER.`,
+        `Kategori biaya operasional tidak valid: '${input.category}'.`,
       );
     }
     const description = input.description?.trim();

@@ -65,16 +65,28 @@ export const CASHFLOW_CATEGORY_LABEL: Record<CashflowCategory, string> = {
   CLIENT_PAYMENT: "Client Payment",
   VENDOR_PAYMENT: "Vendor Payment",
   CREW_PAYMENT: "Crew Payment",
-  TRANSPORT: "Transport",
-  EQUIPMENT: "Equipment",
-  OTHER: "Other",
+  TRANSPORT: "Transport (legacy)",
+  EQUIPMENT: "Peralatan",
+  OTHER: "Lainnya (legacy)",
+  INTERNET: "Beban — Internet",
+  ELECTRICITY: "Beban — Listrik",
+  SALARY: "Beban — Gaji",
+  RENT: "Beban — Sewa",
+  SUPPLIES: "Perlengkapan",
 };
 
 /**
  * Kategori biaya operasional umum (tanpa Job diperbolehkan). Selaras dengan
- * `RecordGeneralExpenseInput` kanonik (TRANSPORT | EQUIPMENT | OTHER).
+ * Kategori beban dan pembelian operasional yang dapat dicatat.
  */
-export const GENERAL_EXPENSE_CATEGORIES = ["TRANSPORT", "EQUIPMENT", "OTHER"] as const;
+export const GENERAL_EXPENSE_CATEGORIES = [
+  "INTERNET",
+  "ELECTRICITY",
+  "SALARY",
+  "RENT",
+  "EQUIPMENT",
+  "SUPPLIES",
+] as const;
 
 /** Label client type kanonik (dipakai form client). */
 export const CLIENT_TYPE_LABEL = {
