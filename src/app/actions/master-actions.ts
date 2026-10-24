@@ -66,9 +66,13 @@ function clientInputFrom(values: Record<string, string>) {
     throw new Error("Invalid client type.");
   }
   return {
-    name: requireText(values, "name", "Client name"),
-    cpw: optionalText(values, "cpw"),
-    cpp: optionalText(values, "cpp"),
+    name: requireText(values, "cpw", "Nama lengkap pengantin wanita"),
+    cpw: requireText(values, "cpw", "Nama lengkap pengantin wanita"),
+    cpp: requireText(values, "cpp", "Nama lengkap pengantin pria"),
+    cpwNickname: optionalText(values, "cpwNickname"),
+    cpwInstagram: optionalText(values, "cpwInstagram"),
+    cppNickname: optionalText(values, "cppNickname"),
+    cppInstagram: optionalText(values, "cppInstagram"),
     companyName: optionalText(values, "companyName"),
     contactPerson: optionalText(values, "contactPerson"),
     phone: optionalText(values, "phone"),
@@ -76,6 +80,8 @@ function clientInputFrom(values: Record<string, string>) {
     address: optionalText(values, "address"),
     clientType: (clientType || undefined) as ClientType | undefined,
     notes: optionalText(values, "notes"),
+    eventDate: optionalText(values, "eventDate"),
+    packageId: optionalText(values, "packageId"),
   };
 }
 
@@ -97,16 +103,12 @@ export async function deleteClientAction(id: string): Promise<MasterActionResult
 }
 
 function packageInputFrom(values: Record<string, string>) {
-  const sortOrderRaw = values.sortOrder?.trim();
-  const sortOrder = sortOrderRaw ? Number(sortOrderRaw) : 0;
-  if (!Number.isInteger(sortOrder) || sortOrder < 0) {
-    throw new Error("Sort order must be a whole number of zero or greater.");
-  }
+  const price = parseAmountInput(values.price);
+  if (price === null) throw new Error("Isi harga paket dengan angka yang valid.");
   return {
     name: requireText(values, "name", "Package name"),
-    description: optionalText(values, "description"),
-    sortOrder,
-    isActive: values.isActive !== "false",
+    price,
+    deliverables: optionalText(values, "deliverables"),
   };
 }
 

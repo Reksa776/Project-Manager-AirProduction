@@ -77,8 +77,14 @@ export async function getCurrentAdmin(): Promise<{ id: string; name: string } | 
 
 export interface ClientInput {
   name: string;
+  nickname?: string;
+  instagram?: string;
   cpw?: string;
   cpp?: string;
+  cpwNickname?: string;
+  cpwInstagram?: string;
+  cppNickname?: string;
+  cppInstagram?: string;
   companyName?: string;
   contactPerson?: string;
   phone?: string;
@@ -86,6 +92,8 @@ export interface ClientInput {
   address?: string;
   clientType?: CreateClientInput["clientType"];
   notes?: string;
+  eventDate?: string;
+  packageId?: string;
 }
 
 export interface VendorInput {

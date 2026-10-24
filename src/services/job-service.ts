@@ -11,6 +11,8 @@ import type {
   Cashflow,
   CashflowCategory,
   CashflowReferenceType,
+  Crew,
+  CrewRole,
   Delivery,
   Job,
   JobCategory,
@@ -104,7 +106,10 @@ function summarizeJobFinancials(
 /* Reads                                                                      */
 /* -------------------------------------------------------------------------- */
 
-export async function getJobListItems(): Promise<JobListItem[]> {
+export async function getJobListItems(
+  { includeCrewStatus = false }: { includeCrewStatus?: boolean } = {},
+): Promise<JobListItem[]> {
+  const app = getApplication();
   const [jobs, clients, vendors] = await Promise.all([
     listJobsForRequest(),
     listClientsForRequest(),
@@ -112,17 +117,52 @@ export async function getJobListItems(): Promise<JobListItem[]> {
   ]);
   const clientMap = buildLookup(clients);
   const vendorMap = buildLookup(vendors);
+  const crewMap = new Map<string, Crew>();
+  let activeRoles: CrewRole[] = [];
+  const assignedRolesByJob = new Map<string, Set<string>>();
+  const assignedJobs = new Set<string>();
+  if (includeCrewStatus) {
+    const [crew, roles, assignments] = await Promise.all([
+      listCrewForRequest(),
+      listCrewRolesForRequest(),
+      app.repositories.jobCrewAssignments.getAll(),
+    ]);
+    for (const member of crew) crewMap.set(member.id, member);
+    activeRoles = roles.filter((role) => role.isActive);
+    for (const assignment of assignments) {
+      assignedJobs.add(assignment.jobId);
+      const roleId = assignment.crewRoleId ?? crewMap.get(assignment.crewId)?.crewRoleId;
+      if (!roleId) continue;
+      const roleIds = assignedRolesByJob.get(assignment.jobId) ?? new Set<string>();
+      roleIds.add(roleId);
+      assignedRolesByJob.set(assignment.jobId, roleIds);
+    }
+  }
 
   const items: JobListItem[] = [];
   for (const job of jobs) {
     const counterparty: Counterparty | null = resolveCounterparty(job, clientMap, vendorMap);
     if (!counterparty) continue;
+    const enrichedCounterparty = counterparty.type === "CLIENT"
+      ? {
+          ...counterparty,
+          name: [clientMap.get(counterparty.id)?.cpw, clientMap.get(counterparty.id)?.cpp].filter(Boolean).join(" & ") || counterparty.name,
+          cpw: clientMap.get(counterparty.id)?.cpw,
+          cpp: clientMap.get(counterparty.id)?.cpp,
+        }
+      : counterparty;
     items.push({
       id: job.id,
       jobNumber: job.jobNumber,
       jobName: job.jobName,
       category: job.category,
-      counterparty,
+      counterparty: enrichedCounterparty,
+      cpw: enrichedCounterparty.cpw,
+      cpp: enrichedCounterparty.cpp,
+      hasCrewAssignments: assignedJobs.has(job.id),
+      missingCrewRoles: activeRoles
+        .filter((role) => !assignedRolesByJob.get(job.id)?.has(role.id))
+        .map((role) => role.name),
       packageId: job.packageId,
       legacyVenueName: job.legacyVenueName,
       executionDate: job.executionDate,
@@ -195,7 +235,13 @@ async function resolveJobCounterparty(job: Job): Promise<Counterparty> {
   const app = getApplication();
   if (job.clientId) {
     const client = await app.services.master.getClient(job.clientId);
-    return { type: "CLIENT", id: job.clientId, name: client?.name ?? "Client tidak dikenal" };
+    return {
+      type: "CLIENT",
+      id: job.clientId,
+      name: [client?.cpw, client?.cpp].filter(Boolean).join(" & ") || client?.name || "Client tidak dikenal",
+      cpw: client?.cpw,
+      cpp: client?.cpp,
+    };
   }
   if (job.vendorId) {
     const vendor = await app.services.master.getVendor(job.vendorId);
@@ -296,7 +342,21 @@ export interface JobInput {
 
 export async function createJob(input: JobInput): Promise<Job> {
   const app = getApplication();
-  return app.services.jobs.createJob(normalizeJobInput(input));
+  const normalized = normalizeJobInput(input);
+  const created = await app.services.jobs.createJob({ ...normalized, status: statusFromExecutionDate(normalized.executionDate) });
+  if (created.clientId && created.packageId) {
+    const selectedPackage = await app.services.master.getPackage(created.packageId);
+    const items = selectedPackage?.deliverables?.split(/\r?\n/).map((name) => name.trim()).filter(Boolean) ?? [];
+    try {
+      for (const name of items) {
+        await app.services.deliveries.createDelivery({ jobId: created.id, name, deadline: created.executionDate, status: "NOT_STARTED" });
+      }
+    } catch (error) {
+      await app.services.jobs.deleteJob(created.id);
+      throw error;
+    }
+  }
+  return created;
 }
 
 export async function updateJob(id: string, input: JobInput): Promise<Job> {
@@ -307,7 +367,14 @@ export async function updateJob(id: string, input: JobInput): Promise<Job> {
   if (existing && existing.id !== id) {
     throw new Error(`Job number '${jobNumber}' sudah dipakai job lain.`);
   }
-  return app.services.jobs.updateJob(id, normalizeJobInput(input));
+  const normalized = normalizeJobInput(input);
+  return app.services.jobs.updateJob(id, { ...normalized, status: statusFromExecutionDate(normalized.executionDate) });
+}
+
+function statusFromExecutionDate(date: string): JobStatus {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const today = `${parts.find((part) => part.type === "year")?.value}-${parts.find((part) => part.type === "month")?.value}-${parts.find((part) => part.type === "day")?.value}`;
+  return date < today ? "COMPLETED" : date === today ? "IN_PROGRESS" : "NOT_STARTED";
 }
 
 function normalizeJobInput(input: JobInput): CreateJobInput {

@@ -1,0 +1,1 @@
+ALTER TABLE "jobs" ALTER COLUMN "location" SET DATA TYPE text;

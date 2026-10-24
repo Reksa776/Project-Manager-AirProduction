@@ -54,7 +54,7 @@ const TABS = [
   { id: "overview", label: "Overview" },
   { id: "crew", label: "Crew" },
   { id: "delivery", label: "Delivery" },
-  { id: "finance", label: "Schedules & Cashflow" },
+  { id: "finance", label: "Schedule & Cashflow" },
   { id: "expense", label: "Expense" },
 ] as const;
 
@@ -107,6 +107,24 @@ function PanelHeading({ title, description }: { title: string; description?: str
     <div className="space-y-1 px-6 py-5">
       <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-ink">{title}</h3>
       {description ? <p className="text-[13px] text-ink-soft">{description}</p> : null}
+    </div>
+  );
+}
+
+function CashflowRows({ cashflows }: { cashflows: JobDetail["cashflows"] }) {
+  if (cashflows.length === 0) return <p className="border-t border-line px-6 py-4 text-[13px] text-ink-muted">Belum ada transaksi cashflow.</p>;
+  return (
+    <div className="min-w-0 max-w-full overflow-x-auto border-t border-line">
+      <Table>
+        <THead><TR><TH>Tanggal</TH><TH>Arah</TH><TH>Kategori</TH><TH>Deskripsi</TH><TH>Jumlah</TH></TR></THead>
+        <TBody>{cashflows.map((flow) => <TR key={flow.id}>
+          <TD className="whitespace-nowrap">{formatShortDate(flow.occurredOn)}</TD>
+          <TD>{flow.direction === "INCOME" ? "Masuk" : "Keluar"}</TD>
+          <TD>{CASHFLOW_CATEGORY_LABEL[flow.category]}</TD>
+          <TD className="text-ink-soft">{flow.description}</TD>
+          <TD className="tabular-nums">{formatCurrency(flow.amount)}</TD>
+        </TR>)}</TBody>
+      </Table>
     </div>
   );
 }
@@ -465,10 +483,10 @@ export function JobDetailTabs({
 
       {active === "finance" ? (
         <div className="space-y-6">
-          <Panel className="overflow-hidden">
+          <Panel className={cn("overflow-hidden", detail.counterparty.type !== "CLIENT" && "hidden")}>
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-6 py-4">
               <div>
-                <h3 className="text-[15px] font-semibold text-ink">Client Billing Schedule</h3>
+                <h3 className="text-[15px] font-semibold text-ink">Client Schedule &amp; Cashflow</h3>
                 <p className="text-[13px] text-ink-soft">
                   Obligasi (bukan kas). Status dihitung from kas aktual.
                 </p>
@@ -543,12 +561,13 @@ export function JobDetailTabs({
                 </Table>
               </div>
             )}
+            <CashflowRows cashflows={detail.cashflows} />
           </Panel>
 
-          <Panel className="overflow-hidden">
+          <Panel className={cn("overflow-hidden", detail.counterparty.type !== "VENDOR" && "hidden")}>
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-6 py-4">
               <div>
-                <h3 className="text-[15px] font-semibold text-ink">Vendor Payment Schedule</h3>
+                <h3 className="text-[15px] font-semibold text-ink">Vendor Schedule &amp; Cashflow</h3>
                 <p className="text-[13px] text-ink-soft">Vendor deposit and final payment obligations.</p>
               </div>
               <div className="flex gap-2">
@@ -621,41 +640,7 @@ export function JobDetailTabs({
                 </Table>
               </div>
             )}
-          </Panel>
-
-          <Panel className="overflow-hidden">
-            <PanelHeading
-              title="Job Cashflow"
-              description="Actual cash movements. Records cannot be edited or deleted."
-            />
-            {detail.cashflows.length === 0 ? (
-              <EmptyState icon="finance" title="No cashflow recorded yet" description="Client, vendor, and crew payments and expenses will appear here." />
-            ) : (
-              <div className="min-w-0 max-w-full overflow-x-auto border-t border-line">
-                <Table>
-                  <THead>
-                    <TR>
-                      <TH>Date</TH>
-                      <TH>Direction</TH>
-                      <TH>Category</TH>
-                      <TH>Description</TH>
-                      <TH>Amount</TH>
-                    </TR>
-                  </THead>
-                  <TBody>
-                    {detail.cashflows.map((flow) => (
-                      <TR key={flow.id}>
-                        <TD className="whitespace-nowrap">{formatShortDate(flow.occurredOn)}</TD>
-                        <TD>{flow.direction === "INCOME" ? "Incoming" : "Outgoing"}</TD>
-                        <TD>{CASHFLOW_CATEGORY_LABEL[flow.category]}</TD>
-                        <TD className="text-ink-soft">{flow.description}</TD>
-                        <TD className="tabular-nums">{formatCurrency(flow.amount)}</TD>
-                      </TR>
-                    ))}
-                  </TBody>
-                </Table>
-              </div>
-            )}
+            <CashflowRows cashflows={detail.cashflows} />
           </Panel>
         </div>
       ) : null}

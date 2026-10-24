@@ -28,7 +28,6 @@ import {
   isClientType,
   isDeliveryStatus,
   isJobCategory,
-  isJobStatus,
 } from "@/domain/validation";
 import { RepositoryError } from "@/repositories/mysql/errors";
 
@@ -74,8 +73,14 @@ export function rowToCanonicalClient(row: ClientRow): Client {
   return {
     id: row.id,
     name: row.name,
+    nickname: opt(row.nickname),
+    instagram: opt(row.instagram),
     cpw: opt(row.cpw),
     cpp: opt(row.cpp),
+    cpwNickname: opt(row.cpwNickname),
+    cpwInstagram: opt(row.cpwInstagram),
+    cppNickname: opt(row.cppNickname),
+    cppInstagram: opt(row.cppInstagram),
     companyName: opt(row.companyName),
     contactPerson: opt(row.contactPerson),
     phone: opt(row.phone),
@@ -83,6 +88,8 @@ export function rowToCanonicalClient(row: ClientRow): Client {
     address: opt(row.address),
     clientType: row.clientType === null ? undefined : requireEnum(row.clientType, isClientType, "clients.client_type"),
     notes: opt(row.notes),
+    eventDate: opt(row.eventDate),
+    packageId: opt(row.packageId),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -93,6 +100,8 @@ export function rowToPackage(row: PackageRow): Package {
     id: row.id,
     name: row.name,
     description: opt(row.description),
+    price: row.price === null ? undefined : parseAmount(row.price),
+    deliverables: opt(row.deliverables),
     sortOrder: Number(row.sortOrder),
     isActive: Boolean(row.isActive),
     createdAt: row.createdAt,
@@ -138,6 +147,8 @@ export function rowToCanonicalCrew(row: CanonicalCrewRow): Crew {
 }
 
 export function rowToCanonicalJob(row: JobRow): Job {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const today = `${parts.find((part) => part.type === "year")?.value}-${parts.find((part) => part.type === "month")?.value}-${parts.find((part) => part.type === "day")?.value}`;
   return {
     id: row.id,
     jobNumber: row.jobNumber,
@@ -147,7 +158,7 @@ export function rowToCanonicalJob(row: JobRow): Job {
     vendorId: opt(row.vendorId),
     packageId: opt(row.packageId),
     executionDate: row.executionDate,
-    status: requireEnum(row.status, isJobStatus, "jobs.status"),
+    status: row.executionDate < today ? "COMPLETED" : row.executionDate === today ? "IN_PROGRESS" : "NOT_STARTED",
     location: opt(row.location),
     notes: opt(row.notes),
     legacyVenueName: opt(row.legacyVenueName),

@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/ui";
 import { getClients, getPackages, getVendors } from "@/services/master-service";
 import { getJobListItems } from "@/services/job-service";
 import { requireAuthenticatedAdmin } from "@/lib/auth";
+import { formatCurrency } from "@/lib/utils";
 import {
   createJobAction,
   deleteJobAction,
@@ -20,7 +21,7 @@ export const dynamic = "force-dynamic";
 export default async function JobsPage() {
   const admin = await requireAuthenticatedAdmin();
   const [jobs, clients, vendors, packages] = await Promise.all([
-    getJobListItems(),
+    getJobListItems({ includeCrewStatus: true }),
     getClients(),
     getVendors(),
     getPackages(true),
@@ -36,9 +37,9 @@ export default async function JobsPage() {
       />
       <JobsTable
         jobs={jobs}
-        clients={clients}
+        clients={clients.map(({ id, name, packageId, eventDate }) => ({ id, name, packageId, eventDate }))}
         vendors={vendors}
-        packages={packages.map(({ id, name, description }) => ({ id, name, description }))}
+        packages={packages.map(({ id, name, price, deliverables }) => ({ id, name, price: price ? formatCurrency(price) : undefined, deliverables }))}
         createAction={createJobAction}
         updateAction={updateJobAction}
         deleteAction={deleteJobAction}

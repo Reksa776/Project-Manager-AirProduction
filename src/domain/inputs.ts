@@ -19,8 +19,14 @@ import type {
 
 export interface CreateClientInput {
   name: string;
+  nickname?: string;
+  instagram?: string;
   cpw?: string;
   cpp?: string;
+  cpwNickname?: string;
+  cpwInstagram?: string;
+  cppNickname?: string;
+  cppInstagram?: string;
   companyName?: string;
   contactPerson?: string;
   phone?: string;
@@ -28,11 +34,15 @@ export interface CreateClientInput {
   address?: string;
   clientType?: ClientType;
   notes?: string;
+  eventDate?: string;
+  packageId?: string;
 }
 
 export interface CreatePackageInput {
   name: string;
   description?: string;
+  price?: Amount;
+  deliverables?: string;
   sortOrder?: number;
   isActive?: boolean;
 }

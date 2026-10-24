@@ -8,8 +8,10 @@ import { Button, Card, Input } from "@/components/ui";
 
 export function ClientIntakeForm({
   createAction,
+  packages,
 }: {
   createAction: (values: Record<string, string>) => Promise<MasterActionResult>;
+  packages: Array<{ id: string; name: string; price: string }>;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -29,9 +31,7 @@ export function ClientIntakeForm({
       setMessage({ type: "error", text: result.error });
       return;
     }
-    form.reset();
-    setMessage({ type: "success", text: "Terima kasih, data Anda berhasil dikirim. Tim kami akan segera menghubungi Anda." });
-    router.refresh();
+    router.replace("/client-form/submitted");
   }
 
   return (
@@ -40,7 +40,7 @@ export function ClientIntakeForm({
         <div className="h-1 bg-[#3978c5]" />
         <div className="min-w-0 px-4 py-5 sm:px-9 sm:py-7">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#3978c5]">Air Production</p>
-          <h1 className="mt-3 break-words text-xl font-semibold tracking-[-0.02em] text-[#17212f] sm:text-2xl">Data Klien</h1>
+          <h1 className="mt-3 break-words text-xl font-semibold tracking-[-0.02em] text-[#17212f] sm:text-2xl">Informasi Pengantin &amp; Acara</h1>
           <p className="mt-2 max-w-xl text-[13px] leading-5 text-[#657184] sm:text-sm sm:leading-6">Isi informasi diri dan acara Anda. Tim kami akan menghubungi Anda melalui kontak yang dicantumkan.</p>
           <p className="mt-5 border-t border-[#edf0f4] pt-3 text-xs text-[#738096]"><span className="text-[#3978c5]">*</span> Wajib diisi</p>
         </div>
@@ -52,14 +52,22 @@ export function ClientIntakeForm({
         </div>
         <Card className="min-w-0 space-y-5 rounded-xl border border-[#e1e5eb] p-4 shadow-[0_2px_8px_rgba(20,35,55,0.04)] sm:space-y-6 sm:p-8">
           <div>
-            <h2 className="text-sm font-semibold text-[#17212f]">Informasi diri</h2>
-            <p className="mt-1 text-xs leading-5 text-[#738096]">Informasi kontak calon pengantin.</p>
+            <h2 className="text-sm font-semibold text-[#17212f]">Pengantin wanita</h2>
+            <p className="mt-1 text-xs leading-5 text-[#738096]">Informasi calon pengantin wanita.</p>
           </div>
-          <Input label="Nama klien *" name="name" autoComplete="name" required maxLength={120} className="border-[#d9dfe8] focus:border-[#3978c5] focus:ring-[#3978c5]/10" />
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Input label="CPW" name="cpw" maxLength={120} className="border-[#d9dfe8] focus:border-[#3978c5] focus:ring-[#3978c5]/10" />
-            <Input label="CPP" name="cpp" maxLength={120} className="border-[#d9dfe8] focus:border-[#3978c5] focus:ring-[#3978c5]/10" />
+          <Input label="Nama lengkap *" name="cpw" autoComplete="name" required maxLength={120} className="border-[#d9dfe8] focus:border-[#3978c5] focus:ring-[#3978c5]/10" />
+          <Input label="Nama panggilan" name="cpwNickname" autoComplete="nickname" maxLength={120} className="border-[#d9dfe8] focus:border-[#3978c5] focus:ring-[#3978c5]/10" />
+          <Input label="Username Instagram" name="cpwInstagram" placeholder="@username" maxLength={120} className="border-[#d9dfe8] focus:border-[#3978c5] focus:ring-[#3978c5]/10" />
+        </Card>
+
+        <Card className="min-w-0 space-y-5 rounded-xl border border-[#e1e5eb] p-4 shadow-[0_2px_8px_rgba(20,35,55,0.04)] sm:space-y-6 sm:p-8">
+          <div>
+            <h2 className="text-sm font-semibold text-[#17212f]">Pengantin pria</h2>
+            <p className="mt-1 text-xs leading-5 text-[#738096]">Informasi calon pengantin pria.</p>
           </div>
+          <Input label="Nama lengkap *" name="cpp" autoComplete="name" required maxLength={120} className="border-[#d9dfe8] focus:border-[#3978c5] focus:ring-[#3978c5]/10" />
+          <Input label="Nama panggilan" name="cppNickname" autoComplete="nickname" maxLength={120} className="border-[#d9dfe8] focus:border-[#3978c5] focus:ring-[#3978c5]/10" />
+          <Input label="Username Instagram" name="cppInstagram" placeholder="@username" maxLength={120} className="border-[#d9dfe8] focus:border-[#3978c5] focus:ring-[#3978c5]/10" />
           <Input label="Nomor HP" name="phone" type="tel" autoComplete="tel" maxLength={120} className="border-[#d9dfe8] focus:border-[#3978c5] focus:ring-[#3978c5]/10" />
         </Card>
 
@@ -69,6 +77,14 @@ export function ClientIntakeForm({
             <p className="mt-1 text-xs leading-5 text-[#738096]">Cantumkan lokasi acara agar tim kami dapat mempersiapkannya.</p>
           </div>
           <Input label="Alamat acara *" name="address" autoComplete="street-address" required maxLength={500} className="border-[#d9dfe8] focus:border-[#3978c5] focus:ring-[#3978c5]/10" />
+          <Input label="Tanggal acara *" name="eventDate" type="date" required className="border-[#d9dfe8] focus:border-[#3978c5] focus:ring-[#3978c5]/10" />
+          <div className="space-y-1.5">
+            <label htmlFor="client-package" className="text-[13px] font-medium text-[#596579]">Paket yang diambil *</label>
+            <select id="client-package" name="packageId" required defaultValue="" className="h-10 w-full min-w-0 rounded-lg border border-[#d9dfe8] bg-white px-3 text-sm text-[#17212f] focus:border-[#3978c5] focus:outline-none focus:ring-2 focus:ring-[#3978c5]/10">
+              <option value="" disabled>Pilih paket</option>
+              {packages.map((item) => <option key={item.id} value={item.id}>{item.name}{item.price ? ` — ${item.price}` : ""}</option>)}
+            </select>
+          </div>
           <div className="flex flex-col gap-1.5">
             <label htmlFor="client-notes" className="text-[13px] font-medium text-[#596579]">Catatan untuk tim kami</label>
             <textarea

@@ -59,8 +59,7 @@ export default async function CrewPage() {
         emptyTitle="No crew yet"
         emptyDescription="Saved crew members will appear here with their roles and default payments."
         columns={[
-          { key: "name", label: "Crew Name" },
-          { key: "roleName", label: "Role" },
+          { key: "name", label: "Crew Name", subLabelKey: "roleName" },
           { key: "defaultPaymentLabel", label: "Default Payment" },
           { key: "phone", label: "Phone" },
         ]}
@@ -88,6 +87,11 @@ export default async function CrewPage() {
         updateAction={updateCrewAction}
         deleteAction={deleteCrewAction}
       />
+
+      <div className="pt-2">
+        <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink">Role Pekerjaan</h2>
+        <p className="mt-1 text-sm text-ink-muted">Daftar role yang tersedia dan dipakai sebagai pilihan jabatan crew.</p>
+      </div>
 
       <MasterDataCrud
         entityLabel="Crew Role"

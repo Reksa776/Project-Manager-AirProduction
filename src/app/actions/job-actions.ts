@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
-import type { JobCategory, JobStatus } from "@/domain/types";
-import { isJobCategory, isJobStatus } from "@/domain/validation";
+import type { JobCategory } from "@/domain/types";
+import { isJobCategory } from "@/domain/validation";
 import { createJob, deleteJob, updateJob, type JobInput } from "@/services/job-service";
 import { assertAuthenticatedAdmin } from "@/lib/auth";
 
@@ -36,8 +36,6 @@ async function run(action: () => Promise<unknown>): Promise<JobActionResult> {
 function jobInputFrom(values: Record<string, string>): JobInput {
   const category = (values.category || "WEDDING") as JobCategory;
   if (!isJobCategory(category)) throw new Error("Invalid job category.");
-  const status = (values.status || "NOT_STARTED") as JobStatus;
-  if (!isJobStatus(status)) throw new Error("Invalid job status.");
 
   const counterpartyType = values.counterpartyType === "VENDOR" ? "VENDOR" : "CLIENT";
   const counterpartyId = values.counterpartyId?.trim();
@@ -56,7 +54,7 @@ function jobInputFrom(values: Record<string, string>): JobInput {
     vendorId: counterpartyType === "VENDOR" ? counterpartyId : undefined,
     packageId: values.packageId?.trim() || undefined,
     executionDate,
-    status,
+    status: "NOT_STARTED",
     location: values.location?.trim() || undefined,
     notes: values.notes?.trim() || undefined,
     legacyVenueName: values.legacyVenueName?.trim() || undefined,

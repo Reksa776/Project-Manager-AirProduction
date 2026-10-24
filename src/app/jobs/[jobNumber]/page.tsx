@@ -80,12 +80,21 @@ export default async function JobDetailPage({
           label={counterparty.type === "VENDOR" ? "Vendor" : "Client"}
           value={counterparty.name}
         />
+        {counterparty.type === "CLIENT" ? <>
+          <MetaItem label="CPW" value={counterparty.cpw ?? "-"} />
+          <MetaItem label="CPP" value={counterparty.cpp ?? "-"} />
+        </> : null}
         <MetaItem label="Execution Date" value={formatShortDate(job.executionDate)} />
         <MetaItem label="Location" value={job.location ?? "-"} />
         <MetaItem label="Category" value={JOB_CATEGORY_LABEL[job.category]} />
         <MetaItem label="Status" value={JOB_STATUS_LABEL[job.status]} />
       </dl>
 
+      {detail.crewAssignments.length === 0 ? (
+        <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <strong>Perhatian:</strong> belum ada crew yang ditugaskan untuk job ini. Tambahkan crew agar persiapan tim terpantau.
+        </div>
+      ) : null}
       <JobDetailTabs detail={detail} crew={crew} crewRoles={crewRoles} />
     </div>
     </AppShell>

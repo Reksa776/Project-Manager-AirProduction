@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { ClientIntakeForm } from "@/components/clients/client-intake-form";
 import { submitPublicClientForm } from "@/app/actions/public-client-actions";
+import { getPackages } from "@/services/master-service";
+import { formatCurrency } from "@/lib/utils";
 
 export const metadata = {
   title: "Formulir Data Klien · Air Production",
@@ -11,6 +13,7 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function PublicClientFormPage() {
+  const packages = await getPackages(true);
   return (
     <main className="min-h-screen w-full bg-[#f6f8fb] px-3 py-6 text-[#17212f] sm:px-6 sm:py-12">
       <div className="mx-auto w-full min-w-0 max-w-[680px]">
@@ -18,7 +21,10 @@ export default async function PublicClientFormPage() {
           <p className="text-[13px] font-semibold tracking-[-0.01em] text-[#26364a] sm:text-sm">Air Production</p>
           <p className="ml-auto text-right text-[11px] text-[#778397] sm:ml-0 sm:text-xs">Penyelenggara Pernikahan &amp; Acara</p>
           </div>
-        <ClientIntakeForm createAction={submitPublicClientForm} />
+        <ClientIntakeForm
+          createAction={submitPublicClientForm}
+          packages={packages.map((item) => ({ id: item.id, name: item.name, price: item.price ? formatCurrency(item.price) : "" }))}
+        />
         <p className="mt-5 px-2 text-center text-[11px] leading-5 text-[#778397] sm:px-3 sm:text-xs">
           Informasi Anda akan digunakan oleh tim Air Production untuk menindaklanjuti acara.
         </p>

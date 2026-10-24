@@ -77,7 +77,7 @@ export function createMasterService(
 
     async listPackages() {
       const all = await packages.getAll();
-      return all.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "en"));
+      return all.sort((a, b) => a.name.localeCompare(b.name, "en"));
     },
     getPackage: (id) => packages.getById(id),
     createPackage: (input) => packages.create(input),

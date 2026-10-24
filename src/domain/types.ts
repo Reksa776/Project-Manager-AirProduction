@@ -93,8 +93,14 @@ export interface CrewRole {
 export interface Client {
   id: string;
   name: string;
+  nickname?: string;
+  instagram?: string;
   cpw?: string;
   cpp?: string;
+  cpwNickname?: string;
+  cpwInstagram?: string;
+  cppNickname?: string;
+  cppInstagram?: string;
   companyName?: string;
   contactPerson?: string;
   phone?: string;
@@ -102,6 +108,8 @@ export interface Client {
   address?: string;
   clientType?: ClientType;
   notes?: string;
+  eventDate?: string;
+  packageId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -110,6 +118,8 @@ export interface Package {
   id: string;
   name: string;
   description?: string;
+  price?: Amount;
+  deliverables?: string;
   sortOrder: number;
   isActive: boolean;
   createdAt: string;

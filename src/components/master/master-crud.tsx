@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import {
@@ -22,7 +21,7 @@ import type { MasterActionResult } from "@/app/actions/master-actions";
 export interface MasterFieldConfig {
   key: string;
   label: string;
-  type?: "text" | "number" | "textarea" | "select";
+  type?: "text" | "date" | "number" | "textarea" | "repeatable" | "select";
   /** Opsi untuk `type: "select"` (mis. role crew / jenis client kanonik). */
   options?: Array<{ value: string; label: string }>;
   required?: boolean;
@@ -33,7 +32,7 @@ export interface MasterFieldConfig {
 
 export interface MasterCrudProps {
   entityLabel: string;
-  columns: Array<{ key: string; label: string }>;
+  columns: Array<{ key: string; label: string; subLabelKey?: string }>;
   /** Setiap row berisi `id` plus nilai terformat untuk kolom & form. */
   rows: Array<Record<string, string>>;
   fields: MasterFieldConfig[];
@@ -65,7 +64,6 @@ export function MasterDataCrud({
   updateAction,
   deleteAction,
 }: MasterCrudProps) {
-  const router = useRouter();
   const [query, setQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -110,7 +108,6 @@ export function MasterDataCrud({
       return;
     }
     setModalOpen(false);
-    router.refresh();
   }
 
   async function handleConfirmDelete() {
@@ -125,7 +122,6 @@ export function MasterDataCrud({
     }
     setDeleteTarget(null);
     setPageError(null);
-    router.refresh();
   }
 
   return (
@@ -193,7 +189,10 @@ export function MasterDataCrud({
                       key={col.key}
                       className={col.key === columns[0].key ? "font-medium text-ink" : undefined}
                     >
-                      {row[col.key] || "-"}
+                      <>
+                        {row[col.key] || "-"}
+                        {col.subLabelKey ? <span className="mt-0.5 block text-xs font-normal text-ink-muted">{row[col.subLabelKey] || "-"}</span> : null}
+                      </>
                     </TD>
                   ))}
                   <TD>
@@ -259,6 +258,46 @@ export function MasterDataCrud({
                   setDraft((prev) => ({ ...prev, [field.key]: event.target.value }))
                 }
               />
+            ) : field.type === "repeatable" ? (
+              <div key={field.key} className="space-y-3">
+                <div>
+                  <p className="text-[13px] font-medium text-ink-soft">{field.label}</p>
+                  {field.hint ? <p className="mt-1 text-xs text-ink-muted">{field.hint}</p> : null}
+                </div>
+                {(draft[field.key] ?? "").split("\n").map((item, index, items) => (
+                  <div key={`${field.key}-${index}`} className="flex min-w-0 items-end gap-2">
+                    <Input
+                      label={`Deliverable ${index + 1}`}
+                      value={item}
+                      onChange={(event) => {
+                        const next = [...items];
+                        next[index] = event.target.value;
+                        setDraft((previous) => ({ ...previous, [field.key]: next.join("\n") }));
+                      }}
+                    />
+                    {items.length > 1 ? (
+                      <button
+                        type="button"
+                        aria-label={`Hapus deliverable ${index + 1}`}
+                        className="mb-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line text-lg text-ink-muted hover:bg-app hover:text-ink"
+                        onClick={() => {
+                          const next = items.filter((_, itemIndex) => itemIndex !== index);
+                          setDraft((previous) => ({ ...previous, [field.key]: next.join("\n") }));
+                        }}
+                      >
+                        −
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="inline-flex h-9 items-center rounded-lg border border-line px-3 text-[13px] font-medium text-ink hover:bg-app"
+                  onClick={() => setDraft((previous) => ({ ...previous, [field.key]: `${previous[field.key] ?? ""}\n` }))}
+                >
+                  + Tambah deliverable
+                </button>
+              </div>
             ) : field.type === "textarea" ? (
               <div key={field.key} className="flex flex-col gap-1.5">
                 <label className="text-[13px] font-medium text-ink-soft">{field.label}</label>
@@ -274,7 +313,7 @@ export function MasterDataCrud({
               <Input
                 key={field.key}
                 label={field.label}
-                type="text"
+                type={field.type === "date" ? "date" : "text"}
                 inputMode={field.type === "number" ? "numeric" : undefined}
                 hint={field.hint}
                 value={draft[field.key] ?? ""}

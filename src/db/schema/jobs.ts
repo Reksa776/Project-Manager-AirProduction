@@ -39,7 +39,7 @@ export const jobs = pgTable(
     }),
     executionDate: date("execution_date", { mode: "string" }).notNull(),
     status: varchar("status", { length: 20 }).notNull(),
-    location: varchar("location", { length: 190 }),
+    location: text("location"),
     notes: text("notes"),
     legacyVenueName: varchar("legacy_venue_name", { length: 190 }),
     ...timestamps(),

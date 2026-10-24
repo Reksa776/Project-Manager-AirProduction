@@ -1,9 +1,11 @@
 import Link from "next/link";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { Card, EmptyState, PageHeader, TBody, TD, TH, THead, TR, Table } from "@/components/ui";
-import { getClients } from "@/services/master-service";
+import { Card, PageHeader } from "@/components/ui";
+import { getClients, getPackages } from "@/services/master-service";
 import { requireAuthenticatedAdmin } from "@/lib/auth";
+import { MasterDataCrud } from "@/components/master/master-crud";
+import { createClientAction, deleteClientAction, updateClientAction } from "@/app/actions/master-actions";
 
 export const metadata = {
   title: "Client Submissions · Air Production DB",
@@ -13,7 +15,15 @@ export const dynamic = "force-dynamic";
 
 export default async function ClientsPage() {
   const admin = await requireAuthenticatedAdmin();
-  const clients = await getClients();
+  const [clients, packages] = await Promise.all([getClients(), getPackages()]);
+  const packageOptions = packages.map((item) => ({ value: item.id, label: item.name }));
+  const rows = clients.map((client) => ({
+    id: client.id, name: [client.cpw, client.cpp].filter(Boolean).join(" & ") || client.name,
+    cpw: client.cpw ?? "", cpwNickname: client.cpwNickname ?? "", cpwInstagram: client.cpwInstagram ?? "",
+    cpp: client.cpp ?? "", cppNickname: client.cppNickname ?? "", cppInstagram: client.cppInstagram ?? "",
+    phone: client.phone ?? "", address: client.address ?? "",
+    eventDate: client.eventDate ?? "", packageId: client.packageId ?? "", notes: client.notes ?? "",
+  }));
 
   return (
     <AppShell adminName={admin.name}>
@@ -38,48 +48,28 @@ export default async function ClientsPage() {
           </Link>
         </Card>
 
-        <Card className="overflow-hidden">
-          <div className="flex items-center justify-between border-b border-line px-5 py-4 sm:px-6">
-            <h2 className="text-sm font-semibold text-ink">Submitted Client Information</h2>
-            <span className="text-xs text-ink-muted">{clients.length} submissions</span>
-          </div>
-          {clients.length === 0 ? (
-            <EmptyState
-              icon="clients"
-              title="No client submissions yet"
-              description="Information submitted through /client-form will appear here."
-            />
-          ) : (
-            <div className="min-w-0 max-w-full overflow-x-auto">
-              <Table className="min-w-[1100px]">
-                <THead>
-                  <TR>
-                    <TH>Client</TH>
-                    <TH>CPW</TH>
-                    <TH>CPP</TH>
-                    <TH>Mobile Number</TH>
-                    <TH>Event Address</TH>
-                    <TH>Notes</TH>
-                  </TR>
-                </THead>
-                <TBody>
-                  {clients.map((client) => (
-                    <TR key={client.id}>
-                      <TD className="max-w-56 break-words font-medium text-ink">
-                        {client.name}
-                      </TD>
-                      <TD className="max-w-48 break-words">{client.cpw ?? "-"}</TD>
-                      <TD className="max-w-48 break-words">{client.cpp ?? "-"}</TD>
-                      <TD className="max-w-40 break-words">{client.phone ?? "-"}</TD>
-                      <TD className="max-w-56 break-words">{client.address ?? "-"}</TD>
-                      <TD className="max-w-72 whitespace-pre-wrap break-words">{client.notes ?? "-"}</TD>
-                    </TR>
-                  ))}
-                </TBody>
-              </Table>
-            </div>
-          )}
-        </Card>
+        <MasterDataCrud
+          entityLabel="Client"
+          icon="clients"
+          searchPlaceholder="Cari nama, kontak, atau alamat client..."
+          emptyTitle="Belum ada data client"
+          emptyDescription="Data yang dikirim melalui formulir akan muncul di sini."
+          columns={[{ key: "name", label: "Pengantin" }, { key: "phone", label: "Nomor HP" }, { key: "eventDate", label: "Tanggal acara" }]}
+          rows={rows}
+          fields={[
+            { key: "cpw", label: "Nama lengkap pengantin wanita", required: true },
+            { key: "cpwNickname", label: "Nama panggilan pengantin wanita" },
+            { key: "cpwInstagram", label: "Instagram pengantin wanita" },
+            { key: "cpp", label: "Nama lengkap pengantin pria", required: true },
+            { key: "cppNickname", label: "Nama panggilan pengantin pria" },
+            { key: "cppInstagram", label: "Instagram pengantin pria" },
+            { key: "phone", label: "Nomor HP" }, { key: "address", label: "Alamat acara", type: "textarea" },
+            { key: "eventDate", label: "Tanggal acara", type: "date" },
+            { key: "packageId", label: "Paket", type: "select", options: packageOptions },
+            { key: "notes", label: "Catatan", type: "textarea" },
+          ]}
+          createAction={createClientAction} updateAction={updateClientAction} deleteAction={deleteClientAction}
+        />
       </div>
     </AppShell>
   );

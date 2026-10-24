@@ -34,6 +34,8 @@ export interface Counterparty {
   type: CounterpartyType;
   id: string;
   name: string;
+  cpw?: string;
+  cpp?: string;
 }
 
 export interface JobListItem {
@@ -41,8 +43,13 @@ export interface JobListItem {
   jobNumber: string;
   jobName: string;
   category: JobCategory;
+  cpw?: string;
+  cpp?: string;
   counterparty: Counterparty;
   packageId?: string;
+  /** Active crew roles not represented by an assignment on this job. */
+  missingCrewRoles: string[];
+  hasCrewAssignments: boolean;
   /** Snapshot histori nama venue (venue bukan entity aktif). */
   legacyVenueName?: string;
   executionDate: string;

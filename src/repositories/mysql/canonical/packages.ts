@@ -32,6 +32,8 @@ async function create(db: Database, input: CreatePackageInput): Promise<Package>
     id,
     name: requiredName(input.name),
     description: optionalDescription(input.description),
+    price: input.price ?? null,
+    deliverables: optionalDescription(input.deliverables),
     sortOrder: input.sortOrder ?? 0,
     isActive: input.isActive ?? true,
   });
@@ -46,6 +48,8 @@ async function update(db: Database, id: string, input: CreatePackageInput): Prom
   await db.update(packages).set({
     name: requiredName(input.name),
     description: optionalDescription(input.description),
+    price: input.price ?? null,
+    deliverables: optionalDescription(input.deliverables),
     sortOrder: input.sortOrder ?? 0,
     isActive: input.isActive ?? true,
   }).where(eq(packages.id, id));

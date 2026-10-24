@@ -8,6 +8,7 @@ import {
 } from "@/app/actions/master-actions";
 import { requireAuthenticatedAdmin } from "@/lib/auth";
 import { getPackages } from "@/services/master-service";
+import { formatCurrency } from "@/lib/utils";
 
 export const metadata = { title: "Packages · Air Production DB" };
 export const dynamic = "force-dynamic";
@@ -18,10 +19,9 @@ export default async function PackagesPage() {
   const rows = packages.map((item) => ({
     id: item.id,
     name: item.name,
-    description: item.description ?? "",
-    sortOrder: String(item.sortOrder),
-    isActive: String(item.isActive),
-    status: item.isActive ? "Active" : "Inactive",
+    price: item.price ?? "",
+    priceLabel: item.price ? formatCurrency(item.price) : "",
+    deliverables: item.deliverables?.split(/\r?\n/).filter(Boolean).join(" • ") ?? "",
   }));
 
   return (
@@ -34,30 +34,19 @@ export default async function PackagesPage() {
         <MasterDataCrud
           entityLabel="Package"
           icon="inbox"
-          searchPlaceholder="Search package name or description..."
+          searchPlaceholder="Search package name or deliverables..."
           emptyTitle="No packages yet"
           emptyDescription="Add at least one active package before sharing the client form."
           columns={[
             { key: "name", label: "Package Name" },
-            { key: "description", label: "Description" },
-            { key: "sortOrder", label: "Sort Order" },
-            { key: "status", label: "Status" },
+            { key: "priceLabel", label: "Price" },
+            { key: "deliverables", label: "Deliverables" },
           ]}
           rows={rows}
           fields={[
             { key: "name", label: "Package Name", required: true },
-            { key: "description", label: "Description", type: "textarea" },
-            { key: "sortOrder", label: "Sort Order", type: "number", defaultValue: "0" },
-            {
-              key: "isActive",
-              label: "Status",
-              type: "select",
-              defaultValue: "true",
-              options: [
-                { value: "true", label: "Active" },
-                { value: "false", label: "Inactive" },
-              ],
-            },
+            { key: "price", label: "Price", type: "number", required: true },
+            { key: "deliverables", label: "Daftar deliverable", type: "repeatable", hint: "Setiap input menjadi satu item Delivery di job." },
           ]}
           createAction={createPackageAction}
           updateAction={updatePackageAction}

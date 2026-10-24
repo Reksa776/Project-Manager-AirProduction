@@ -74,8 +74,14 @@ async function createClient(db: Database, data: CreateClientInput): Promise<Clie
   await db.insert(clients).values({
     id,
     name,
+    nickname: optionalText(data.nickname),
+    instagram: optionalText(data.instagram),
     cpw: optionalText(data.cpw),
     cpp: optionalText(data.cpp),
+    cpwNickname: optionalText(data.cpwNickname),
+    cpwInstagram: optionalText(data.cpwInstagram),
+    cppNickname: optionalText(data.cppNickname),
+    cppInstagram: optionalText(data.cppInstagram),
     companyName: optionalText(data.companyName),
     contactPerson: optionalText(data.contactPerson),
     phone: optionalText(data.phone),
@@ -83,6 +89,8 @@ async function createClient(db: Database, data: CreateClientInput): Promise<Clie
     address: optionalText(data.address),
     clientType: optionalText(data.clientType),
     notes: optionalText(data.notes),
+    eventDate: optionalText(data.eventDate),
+    packageId: optionalText(data.packageId),
   });
   const created = await getClientById(db, id);
   if (!created) throw new RepositoryError("Gagal membaca ulang client yang baru dibuat.");
@@ -94,27 +102,33 @@ async function updateClient(
   id: string,
   data: CreateClientInput,
 ): Promise<Client> {
-  const existing = await getClientById(db, id);
-  if (!existing) throw new RepositoryNotFoundError("clients", id);
   const name = requireText(data.name, "client.name", 120);
-  await db
+  const updated = await db
     .update(clients)
     .set({
       name,
+      nickname: optionalText(data.nickname),
+      instagram: optionalText(data.instagram),
       cpw: optionalText(data.cpw),
       cpp: optionalText(data.cpp),
-      companyName: optionalText(data.companyName),
-      contactPerson: optionalText(data.contactPerson),
+      cpwNickname: optionalText(data.cpwNickname),
+      cpwInstagram: optionalText(data.cpwInstagram),
+      cppNickname: optionalText(data.cppNickname),
+      cppInstagram: optionalText(data.cppInstagram),
       phone: optionalText(data.phone),
-      email: optionalText(data.email),
       address: optionalText(data.address),
-      clientType: optionalText(data.clientType),
       notes: optionalText(data.notes),
+      eventDate: optionalText(data.eventDate),
+      packageId: optionalText(data.packageId),
+      ...(data.companyName === undefined ? {} : { companyName: optionalText(data.companyName) }),
+      ...(data.contactPerson === undefined ? {} : { contactPerson: optionalText(data.contactPerson) }),
+      ...(data.email === undefined ? {} : { email: optionalText(data.email) }),
+      ...(data.clientType === undefined ? {} : { clientType: optionalText(data.clientType) }),
     })
-    .where(eq(clients.id, id));
-  const updated = await getClientById(db, id);
-  if (!updated) throw new RepositoryError("Gagal membaca ulang client yang diperbarui.");
-  return updated;
+    .where(eq(clients.id, id))
+    .returning();
+  if (!updated[0]) throw new RepositoryNotFoundError("clients", id);
+  return rowToCanonicalClient(updated[0]);
 }
 
 async function deleteClient(db: Database, id: string): Promise<void> {
@@ -172,10 +186,10 @@ async function updateVendor(
     .update(vendors)
     .set({
       name,
-      contactPerson: data.contactPerson === undefined ? existing.contactPerson : optionalText(data.contactPerson),
+      contactPerson: data.contactPerson === undefined ? existing.contactPerson ?? null : optionalText(data.contactPerson),
       phone: optionalText(data.phone),
-      email: optionalText(data.email),
-      notes: optionalText(data.notes),
+      email: data.email === undefined ? existing.email ?? null : optionalText(data.email),
+      notes: data.notes === undefined ? existing.notes ?? null : optionalText(data.notes),
     })
     .where(eq(vendors.id, id));
   const updated = await getVendorById(db, id);

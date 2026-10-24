@@ -23,8 +23,6 @@ export default async function VendorsPage() {
     id: vendor.id,
     name: vendor.name,
     contact: vendor.phone ?? "",
-    email: vendor.email ?? "",
-    notes: vendor.notes ?? "",
   }));
 
   return (
@@ -38,20 +36,17 @@ export default async function VendorsPage() {
       <MasterDataCrud
         entityLabel="Vendor"
         icon="vendors"
-        searchPlaceholder="Search name, contact, or notes..."
+        searchPlaceholder="Search vendor name or contact..."
         emptyTitle="No vendors yet"
         emptyDescription="Saved vendors and their contact details will appear here."
         columns={[
           { key: "name", label: "Vendor Name" },
           { key: "contact", label: "Contact" },
-          { key: "email", label: "Email" },
         ]}
         rows={rows}
         fields={[
           { key: "name", label: "Vendor Name", required: true },
           { key: "contact", label: "Contact" },
-          { key: "email", label: "Email" },
-          { key: "notes", label: "Notes", type: "textarea" },
         ]}
         createAction={createVendorAction}
         updateAction={updateVendorAction}

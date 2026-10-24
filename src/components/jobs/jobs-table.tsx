@@ -33,12 +33,6 @@ const CATEGORY_OPTIONS = [
   { value: "OTHER", label: JOB_CATEGORY_LABEL.OTHER },
 ];
 
-const STATUS_FORM_OPTIONS = [
-  { value: "NOT_STARTED", label: JOB_STATUS_LABEL.NOT_STARTED },
-  { value: "IN_PROGRESS", label: JOB_STATUS_LABEL.IN_PROGRESS },
-  { value: "COMPLETED", label: JOB_STATUS_LABEL.COMPLETED },
-];
-
 const COUNTERPARTY_TYPE_OPTIONS = [
   { value: "CLIENT", label: "Client" },
   { value: "VENDOR", label: "Vendor" },
@@ -61,9 +55,9 @@ export function JobsTable({
   deleteAction,
 }: {
   jobs: JobListItem[];
-  clients: Array<{ id: string; name: string }>;
+  clients: Array<{ id: string; name: string; packageId?: string; eventDate?: string }>;
   vendors: Array<{ id: string; name: string }>;
-  packages: Array<{ id: string; name: string; description?: string }>;
+  packages: Array<{ id: string; name: string; price?: string; deliverables?: string }>;
   createAction: (values: Record<string, string>) => Promise<{ ok: true } | { ok: false; error: string }>;
   updateAction: (id: string, values: Record<string, string>) => Promise<{ ok: true } | { ok: false; error: string }>;
   deleteAction: (id: string) => Promise<{ ok: true } | { ok: false; error: string }>;
@@ -182,14 +176,14 @@ export function JobsTable({
           description="Adjust your search or status filter to find a job."
         />
       ) : (
-        <Table className="min-w-[1040px] xl:min-w-full">
+      <Table className="min-w-[980px] xl:min-w-full">
           <THead>
             <TR>
-              <TH>Job Number</TH>
               <TH>Job Name</TH>
               <TH>Client/Vendor</TH>
+              <TH>CPW</TH>
+              <TH>CPP</TH>
               <TH>Package</TH>
-              <TH>Category</TH>
               <TH>Execution Date</TH>
               <TH>Status</TH>
               <TH className="text-right">Actions</TH>
@@ -198,16 +192,34 @@ export function JobsTable({
           <TBody>
             {filtered.map((job) => (
               <TR key={job.id}>
-                <TD className="whitespace-nowrap font-mono text-[12px] text-ink-muted">
-                  {job.jobNumber}
-                </TD>
                 <TD className="max-w-[280px]">
-                  <Link
-                    href={`/jobs/${job.jobNumber}`}
-                    className="block break-words font-medium text-ink hover:text-brand hover:underline"
-                  >
-                    {job.jobName}
-                  </Link>
+                  <div className="flex items-start gap-1.5">
+                    <Link
+                      href={`/jobs/${job.jobNumber}`}
+                      className="min-w-0 break-words font-medium text-ink hover:text-brand hover:underline"
+                    >
+                      {job.jobName}
+                    </Link>
+                    {job.missingCrewRoles.length > 0 || !job.hasCrewAssignments ? (
+                      <span
+                        tabIndex={0}
+                        aria-label={job.missingCrewRoles.length > 0
+                          ? `Crew belum lengkap. Role aktif yang belum ditugaskan: ${job.missingCrewRoles.join(", ")}`
+                          : "Belum ada crew yang ditugaskan untuk job ini."}
+                        className="group relative mt-0.5 inline-flex shrink-0 cursor-help text-amber-600 outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-amber-500"
+                      >
+                        <Icon name="alert" className="h-4 w-4" />
+                        <span
+                          role="tooltip"
+                          className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden w-64 rounded-lg bg-[#252525] px-3 py-2 text-left text-xs font-normal leading-5 text-white shadow-lg group-hover:block group-focus:block"
+                        >
+                          {job.missingCrewRoles.length > 0
+                            ? `Role aktif yang belum ditugaskan: ${job.missingCrewRoles.join(", ")}`
+                            : "Belum ada crew yang ditugaskan untuk job ini."}
+                        </span>
+                      </span>
+                    ) : null}
+                  </div>
                 </TD>
                 <TD className="max-w-[190px]">
                   <span className="break-words text-ink-soft">{job.counterparty.name}</span>
@@ -219,10 +231,9 @@ export function JobsTable({
                         : "Unknown"}
                   </p>
                 </TD>
+                <TD className="max-w-40 break-words">{job.cpw ?? "—"}</TD>
+                <TD className="max-w-40 break-words">{job.cpp ?? "—"}</TD>
                 <TD className="max-w-[180px] break-words">{job.packageId ? packageNames.get(job.packageId) ?? "Unavailable package" : "—"}</TD>
-                <TD className="text-ink-soft">
-                  {JOB_CATEGORY_LABEL[job.category]}
-                </TD>
                 <TD className="whitespace-nowrap text-ink-soft">
                   {formatShortDate(job.executionDate)}
                 </TD>
@@ -281,7 +292,6 @@ export function JobsTable({
             )}
             <Input label="Job Name" value={draft.jobName ?? ""} onChange={(e) => setDraft((p) => ({ ...p, jobName: e.target.value }))} />
             <Select label="Category" options={CATEGORY_OPTIONS} value={draft.category ?? "WEDDING"} onChange={(e) => setDraft((p) => ({ ...p, category: e.target.value }))} />
-            <Select label="Status" options={STATUS_FORM_OPTIONS} value={draft.status ?? "NOT_STARTED"} onChange={(e) => setDraft((p) => ({ ...p, status: e.target.value }))} />
             <Select
               label="Counterparty Type"
               options={COUNTERPARTY_TYPE_OPTIONS}
@@ -293,13 +303,20 @@ export function JobsTable({
               options={counterpartyOptions}
               placeholder="-- Select --"
               value={draft.counterpartyId ?? ""}
-              onChange={(e) => setDraft((p) => ({ ...p, counterpartyId: e.target.value }))}
+              onChange={(e) => {
+                const selectedClient = draft.counterpartyType === "CLIENT" ? clients.find((client) => client.id === e.target.value) : undefined;
+                setDraft((p) => ({
+                  ...p,
+                  counterpartyId: e.target.value,
+                  ...(selectedClient ? { packageId: selectedClient.packageId ?? "", executionDate: selectedClient.eventDate ?? p.executionDate ?? "" } : {}),
+                }));
+              }}
             />
             <Select
               label="Package"
               options={packages.map((item) => ({
                 value: item.id,
-                label: item.description ? `${item.name} — ${item.description}` : item.name,
+                label: `${item.name}${item.price ? ` — ${item.price}` : ""}`,
               }))}
               placeholder="-- No package --"
               value={draft.packageId ?? ""}
