@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { ClientIntakeForm } from "@/components/clients/client-intake-form";
 import { submitPublicClientForm } from "@/app/actions/public-client-actions";
-import { getPackages } from "@/services/master-service";
+import { getClientPackages } from "@/services/master-service";
 import { formatCurrency } from "@/lib/utils";
 
 export const metadata = {
@@ -13,7 +13,7 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function PublicClientFormPage() {
-  const packages = await getPackages(true);
+  const packages = await getClientPackages(true);
   return (
     <main className="min-h-screen w-full bg-[#f6f8fb] px-3 py-6 text-[#17212f] sm:px-6 sm:py-12">
       <div className="mx-auto w-full min-w-0 max-w-[680px]">

@@ -55,9 +55,9 @@ export function JobsTable({
   deleteAction,
 }: {
   jobs: JobListItem[];
-  clients: Array<{ id: string; name: string; packageId?: string; eventDate?: string }>;
+  clients: Array<{ id: string; name: string; packageId?: string; eventDate?: string; cpw?: string; cpp?: string }>;
   vendors: Array<{ id: string; name: string }>;
-  packages: Array<{ id: string; name: string; price?: string; deliverables?: string }>;
+  packages: Array<{ id: string; name: string; price?: string; vendorPrice?: string; deliverables?: string }>;
   createAction: (values: Record<string, string>) => Promise<{ ok: true } | { ok: false; error: string }>;
   updateAction: (id: string, values: Record<string, string>) => Promise<{ ok: true } | { ok: false; error: string }>;
   deleteAction: (id: string) => Promise<{ ok: true } | { ok: false; error: string }>;
@@ -92,7 +92,8 @@ export function JobsTable({
     setDraft({
       jobNumber: "", jobName: "", category: "WEDDING", status: "NOT_STARTED",
       counterpartyType: "CLIENT", counterpartyId: "",
-      packageId: "", executionDate: "", location: "", notes: "",
+      cpw: "", cpp: "", packageId: "", executionDate: "", location: "", notes: "",
+      vendorInstallments: "1",
     });
     setModalError(null);
     setModalOpen(true);
@@ -105,6 +106,7 @@ export function JobsTable({
       status: job.status,
       counterpartyType: job.counterparty.type,
       counterpartyId: job.counterparty.id,
+      cpw: job.cpw ?? "", cpp: job.cpp ?? "",
       packageId: job.packageId ?? "",
       executionDate: job.executionDate, location: job.location ?? "", notes: job.notes ?? "",
     });
@@ -139,6 +141,8 @@ export function JobsTable({
     draft.counterpartyType === "VENDOR"
       ? vendors.map((v) => ({ value: v.id, label: v.name }))
       : clients.map((c) => ({ value: c.id, label: c.name }));
+  const selectedClient = draft.counterpartyType === "CLIENT" ? clients.find((client) => client.id === draft.counterpartyId) : undefined;
+  const visiblePackages = packages.filter((item) => draft.counterpartyType === "VENDOR" ? Boolean(item.vendorPrice) : Boolean(item.price));
   const packageNames = new Map(packages.map((item) => [item.id, item.name]));
 
   return (
@@ -296,7 +300,7 @@ export function JobsTable({
               label="Counterparty Type"
               options={COUNTERPARTY_TYPE_OPTIONS}
               value={draft.counterpartyType ?? "CLIENT"}
-              onChange={(e) => setDraft((p) => ({ ...p, counterpartyType: e.target.value, counterpartyId: "" }))}
+              onChange={(e) => setDraft((p) => ({ ...p, counterpartyType: e.target.value, counterpartyId: "", packageId: "", cpw: "", cpp: "" }))}
             />
             <Select
               label={draft.counterpartyType === "VENDOR" ? "Vendor" : "Client"}
@@ -308,20 +312,28 @@ export function JobsTable({
                 setDraft((p) => ({
                   ...p,
                   counterpartyId: e.target.value,
-                  ...(selectedClient ? { packageId: selectedClient.packageId ?? "", executionDate: selectedClient.eventDate ?? p.executionDate ?? "" } : {}),
+                  packageId: selectedClient?.packageId ?? "",
+                  cpw: selectedClient?.cpw ?? "",
+                  cpp: selectedClient?.cpp ?? "",
+                  ...(selectedClient ? { executionDate: selectedClient.eventDate ?? p.executionDate ?? "" } : {}),
                 }));
               }}
             />
             <Select
               label="Package"
-              options={packages.map((item) => ({
+              options={visiblePackages.map((item) => ({
                 value: item.id,
-                label: `${item.name}${item.price ? ` — ${item.price}` : ""}`,
+                label: `${item.name}${draft.counterpartyType === "VENDOR" ? (item.vendorPrice ? ` — ${item.vendorPrice}` : "") : (item.price ? ` — ${item.price}` : "")}`,
               }))}
               placeholder="-- No package --"
               value={draft.packageId ?? ""}
               onChange={(e) => setDraft((p) => ({ ...p, packageId: e.target.value }))}
             />
+            {draft.counterpartyType === "VENDOR" ? <Select label="Termin pembayaran vendor" options={[{ value: "1", label: "Lunas (1 termin)" }, { value: "2", label: "2 termin" }, { value: "3", label: "3 termin" }]} value={draft.vendorInstallments ?? "1"} onChange={(e) => setDraft((p) => ({ ...p, vendorInstallments: e.target.value }))} /> : null}
+            {draft.counterpartyType === "CLIENT" ? <>
+              <Input label="Nama CPW" value={selectedClient?.cpw ?? draft.cpw ?? ""} readOnly />
+              <Input label="Nama CPP" value={selectedClient?.cpp ?? draft.cpp ?? ""} readOnly />
+            </> : null}
             <Input label="Event Date" type="date" value={draft.executionDate ?? ""} onChange={(e) => setDraft((p) => ({ ...p, executionDate: e.target.value }))} />
             <Input label="Location" value={draft.location ?? ""} onChange={(e) => setDraft((p) => ({ ...p, location: e.target.value }))} />
           </div>

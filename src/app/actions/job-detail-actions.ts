@@ -168,6 +168,8 @@ function deliveryInputFrom(jobId: string, values: Record<string, string>) {
     name,
     deliveryType: values.deliveryType?.trim() || undefined,
     quantity,
+    photoEditorId: values.photoEditorId?.trim() || undefined,
+    videoEditorId: values.videoEditorId?.trim() || undefined,
     deadline,
     status,
     deliveredAt: values.deliveredAt?.trim() || undefined,

@@ -6,7 +6,7 @@ import type {
   CreateJobInput,
   CreateVendorPaymentScheduleInput,
 } from "@/domain/inputs";
-import { addAmounts, subtractAmounts, sumAmounts, type Amount } from "@/domain/money";
+import { addAmounts, fromMinorUnits, subtractAmounts, sumAmounts, toMinorUnits, type Amount } from "@/domain/money";
 import type {
   Cashflow,
   CashflowCategory,
@@ -338,23 +338,19 @@ export interface JobInput {
   location?: string;
   notes?: string;
   legacyVenueName?: string;
+  vendorInstallments?: number;
 }
 
 export async function createJob(input: JobInput): Promise<Job> {
   const app = getApplication();
   const normalized = normalizeJobInput(input);
   const created = await app.services.jobs.createJob({ ...normalized, status: statusFromExecutionDate(normalized.executionDate) });
-  if (created.clientId && created.packageId) {
-    const selectedPackage = await app.services.master.getPackage(created.packageId);
-    const items = selectedPackage?.deliverables?.split(/\r?\n/).map((name) => name.trim()).filter(Boolean) ?? [];
-    try {
-      for (const name of items) {
-        await app.services.deliveries.createDelivery({ jobId: created.id, name, deadline: created.executionDate, status: "NOT_STARTED" });
-      }
-    } catch (error) {
-      await app.services.jobs.deleteJob(created.id);
-      throw error;
-    }
+  try {
+    await ensurePackageDeliveries(created);
+    await ensureAutomaticPaymentSchedules(created, input.vendorInstallments ?? 1);
+  } catch (error) {
+    await app.services.jobs.deleteJob(created.id);
+    throw error;
   }
   return created;
 }
@@ -368,7 +364,104 @@ export async function updateJob(id: string, input: JobInput): Promise<Job> {
     throw new Error(`Job number '${jobNumber}' sudah dipakai job lain.`);
   }
   const normalized = normalizeJobInput(input);
-  return app.services.jobs.updateJob(id, { ...normalized, status: statusFromExecutionDate(normalized.executionDate) });
+  const updated = await app.services.jobs.updateJob(id, { ...normalized, status: statusFromExecutionDate(normalized.executionDate) });
+  await ensurePackageDeliveries(updated);
+  await ensureAutomaticPaymentSchedules(updated, input.vendorInstallments ?? 1);
+  return updated;
+}
+
+async function ensureAutomaticPaymentSchedules(job: Job, vendorInstallments: number): Promise<void> {
+  if (!job.packageId) return;
+  const app = getApplication();
+  const [selectedPackage, existingClient, existingVendor] = await Promise.all([
+    app.services.master.getPackage(job.packageId),
+    app.repositories.clientPaymentSchedules.getByJobId(job.id),
+    app.repositories.vendorPaymentSchedules.getByJobId(job.id),
+  ]);
+  if (!selectedPackage) return;
+
+  const dates = paymentMilestoneDates(job.executionDate, job.createdAt);
+  if (job.clientId && selectedPackage.price && existingClient.length === 0) {
+    const total = toMinorUnits(selectedPackage.price);
+    const deposit = total * BigInt(10) / BigInt(100);
+    const second = total * BigInt(40) / BigInt(100);
+    const final = total - deposit - second;
+    for (const [index, amount] of [deposit, second, final].entries()) {
+      if (amount <= BigInt(0)) continue;
+      await app.financial.createClientPaymentSchedule({
+        jobId: job.id,
+        term: (["TERMIN_1", "TERMIN_2", "TERMIN_3"] as const)[index],
+        amount: fromMinorUnits(amount),
+        dueDate: dates[index],
+        notes: ["DP saat registrasi (minimal 10%)", "Pembayaran kedua", "Pelunasan" ][index],
+      });
+    }
+  }
+
+  if (job.vendorId && selectedPackage.vendorPrice && existingVendor.length === 0) {
+    const count = Math.min(3, Math.max(1, Math.floor(vendorInstallments)));
+    const total = toMinorUnits(selectedPackage.vendorPrice);
+    const base = total / BigInt(count);
+    let remainder = total - base * BigInt(count);
+    for (let index = 0; index < count; index += 1) {
+      const amount = base + (remainder > BigInt(0) ? BigInt(1) : BigInt(0));
+      if (remainder > BigInt(0)) remainder -= BigInt(1);
+      await app.financial.createVendorPaymentSchedule({
+        jobId: job.id,
+        type: index === 0 ? "DP" : "PELUNASAN",
+        amount: fromMinorUnits(amount),
+        dueDate: dates[Math.min(index, 2)],
+        notes: `Termin ${index + 1} dari ${count}`,
+      });
+    }
+  }
+}
+
+function paymentMilestoneDates(eventDate: string, createdAt: string): [string, string, string] {
+  const registration = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(createdAt));
+  const dateAtOffset = (offset: number) => {
+    const date = new Date(`${eventDate}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + offset);
+    return date.toISOString().slice(0, 10);
+  };
+  return [registration, dateAtOffset(-7), dateAtOffset(3)];
+}
+
+/** Add any missing package deliverables to the job's Delivery list. */
+async function ensurePackageDeliveries(job: Job): Promise<void> {
+  if (!job.packageId) return;
+  const app = getApplication();
+  const selectedPackage = await app.services.master.getPackage(job.packageId);
+  const items = selectedPackage?.deliverables?.split(/\r?\n/).map((name) => name.trim()).filter(Boolean) ?? [];
+  if (items.length === 0) return;
+
+  const currentDeliveries = await app.services.deliveries.listByJob(job.id);
+  const existingCounts = new Map<string, number>();
+  for (const delivery of currentDeliveries) {
+    const key = delivery.name.trim().toLocaleLowerCase();
+    existingCounts.set(key, (existingCounts.get(key) ?? 0) + 1);
+  }
+
+  const requiredCounts = new Map<string, number>();
+  for (const name of items) {
+    const key = name.toLocaleLowerCase();
+    const requiredCount = (requiredCounts.get(key) ?? 0) + 1;
+    requiredCounts.set(key, requiredCount);
+    if ((existingCounts.get(key) ?? 0) >= requiredCount) continue;
+
+    await app.services.deliveries.createDelivery({
+      jobId: job.id,
+      name,
+      deadline: job.executionDate,
+      status: "NOT_STARTED",
+    });
+    existingCounts.set(key, requiredCount);
+  }
 }
 
 function statusFromExecutionDate(date: string): JobStatus {

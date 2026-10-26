@@ -43,6 +43,13 @@
       "when": 1792866049258,
       "tag": "0005_oval_bushwacker",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793025652885,
+      "tag": "0006_burly_living_tribunal",
+      "breakpoints": true
     }
   ]
 }

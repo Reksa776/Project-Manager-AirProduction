@@ -63,15 +63,12 @@ function Metric({ label, value, tone }: { label: string; value: number; tone: "a
 
 export function ReceivableSummary({
   receivables,
-  payables,
 }: {
   receivables: ReceivableSummaryData;
-  payables: ReceivableSummaryData;
 }) {
   return (
-    <section aria-label="Ringkasan piutang dan utang" className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
+    <section aria-label="Ringkasan piutang" className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
       <SummaryCard title="Piutang Usaha" description="Pembayaran yang masih perlu diterima dari klien." data={receivables} tone="blue" />
-      <SummaryCard title="Utang Usaha" description="Pembayaran yang masih perlu diselesaikan ke vendor." data={payables} tone="violet" />
     </section>
   );
 }

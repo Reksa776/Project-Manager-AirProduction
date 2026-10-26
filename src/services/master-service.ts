@@ -46,6 +46,10 @@ export async function getPackages(activeOnly = false): Promise<Package[]> {
   return activeOnly ? all.filter((item) => item.isActive) : all;
 }
 
+export async function getClientPackages(activeOnly = false): Promise<Package[]> {
+  return (await getPackages(activeOnly)).filter((item) => Boolean(item.price));
+}
+
 export async function getCrew(): Promise<Crew[]> {
   return listCrewForRequest();
 }

@@ -127,12 +127,12 @@ export interface IncomingWeddingItem {
 }
 
 export interface ProjectMonitoringItem {
-  deliveryId: string;
-  deliveryName: string;
   jobNumber: string;
   jobName: string;
-  deadline: string;
-  status: DeliveryStatus;
+  completedDeliveries: number;
+  totalDeliveries: number;
+  progressPercent: number;
+  nextDeadline?: string;
 }
 
 /** @deprecated Kept as an alias for existing consumers of the dashboard data. */

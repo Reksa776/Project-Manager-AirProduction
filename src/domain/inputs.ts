@@ -42,6 +42,7 @@ export interface CreatePackageInput {
   name: string;
   description?: string;
   price?: Amount;
+  vendorPrice?: Amount;
   deliverables?: string;
   sortOrder?: number;
   isActive?: boolean;
@@ -89,6 +90,8 @@ export interface CreateDeliveryInput {
   name: string;
   deliveryType?: string;
   quantity?: number;
+  photoEditorId?: string;
+  videoEditorId?: string;
   deadline: string;
   status: DeliveryStatus;
   deliveredAt?: string;

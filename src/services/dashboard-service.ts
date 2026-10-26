@@ -43,7 +43,6 @@ export async function getDashboardData(): Promise<DashboardData> {
 
   const clientMap = buildLookup(clients);
   const vendorMap = buildLookup(vendors);
-  const jobMap = buildLookup(jobs);
 
   const summary: DashboardSummary = {
     totalJobs: jobs.length,
@@ -68,19 +67,26 @@ export async function getDashboardData(): Promise<DashboardData> {
       status: job.status,
     }));
 
-  const projectMonitoring: ProjectMonitoringItem[] = deliveries
-    .sort((a, b) => a.deadline.localeCompare(b.deadline))
-    .map((delivery) => {
-      const job = jobMap.get(delivery.jobId);
-      return {
-        deliveryId: delivery.id,
-        deliveryName: delivery.name,
-        jobNumber: job?.jobNumber ?? "-",
-        jobName: job?.jobName ?? "Job tidak dikenal",
-        deadline: delivery.deadline,
-        status: delivery.status,
-      };
-    });
+  const deliveriesByJob = new Map<string, typeof deliveries>();
+  for (const delivery of deliveries) {
+    const list = deliveriesByJob.get(delivery.jobId) ?? [];
+    list.push(delivery);
+    deliveriesByJob.set(delivery.jobId, list);
+  }
+  const projectMonitoring: ProjectMonitoringItem[] = jobs.flatMap((job) => {
+    const jobDeliveries = deliveriesByJob.get(job.id) ?? [];
+    if (jobDeliveries.length === 0) return [];
+    const completedDeliveries = jobDeliveries.filter((delivery) => delivery.status === "COMPLETED").length;
+    const deadlines = jobDeliveries.filter((delivery) => delivery.status !== "COMPLETED").map((delivery) => delivery.deadline).sort();
+    return [{
+      jobNumber: job.jobNumber,
+      jobName: job.jobName,
+      completedDeliveries,
+      totalDeliveries: jobDeliveries.length,
+      progressPercent: Math.round((completedDeliveries / jobDeliveries.length) * 100),
+      nextDeadline: deadlines[0],
+    }];
+  }).sort((a, b) => (a.nextDeadline ?? "9999-12-31").localeCompare(b.nextDeadline ?? "9999-12-31"));
 
   return {
     summary,

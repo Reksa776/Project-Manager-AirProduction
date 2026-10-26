@@ -39,6 +39,8 @@ export interface FinanceFieldConfig {
    * idempoten tanpa input manual dan tanpa fungsi non-serializable from server.
    */
   autoKey?: boolean;
+  readOnly?: boolean;
+  amountByOption?: Record<string, string>;
 }
 
 export interface FinanceCrudProps {
@@ -102,6 +104,15 @@ export function FinanceCrud({
     const matchFilter = !filter || !filterValue || row[filter.key] === filterValue;
     return matchQuery && matchFilter;
   });
+  const hasActions = Boolean(updateAction || deleteAction);
+
+  function handleFieldChange(field: FinanceFieldConfig, value: string) {
+    setDraft((current) => ({
+      ...current,
+      [field.key]: value,
+      ...(field.amountByOption ? { amount: field.amountByOption[value] ?? "" } : {}),
+    }));
+  }
 
   function openCreate() {
     setEditingId(null);
@@ -217,7 +228,7 @@ export function FinanceCrud({
                 {columns.map((col) => (
                   <TH key={col.key}>{col.label}</TH>
                 ))}
-                <TH>Actions</TH>
+                {hasActions ? <TH>Actions</TH> : null}
               </TR>
             </THead>
             <TBody>
@@ -228,7 +239,7 @@ export function FinanceCrud({
                       {row[col.key] || "-"}
                     </TD>
                   ))}
-                  <TD>
+                  {hasActions ? <TD>
                     <div className="flex gap-2">
                       {updateAction ? (
                         <button type="button" className="text-[13px] text-brand hover:underline" onClick={() => openEdit(row)} disabled={busy}>
@@ -241,7 +252,7 @@ export function FinanceCrud({
                         </button>
                       ) : null}
                     </div>
-                  </TD>
+                  </TD> : null}
                 </TR>
               ))}
             </TBody>
@@ -280,7 +291,7 @@ export function FinanceCrud({
                   options={field.options ?? []}
                   placeholder={field.placeholder ?? "-- Select --"}
                   value={draft[field.key] ?? ""}
-                  onChange={(e) => setDraft((p) => ({ ...p, [field.key]: e.target.value }))}
+                  onChange={(e) => handleFieldChange(field, e.target.value)}
                 />
               );
             }
@@ -303,6 +314,7 @@ export function FinanceCrud({
                 type={field.type === "date" ? "date" : "text"}
                 inputMode={field.type === "number" ? "numeric" : undefined}
                 hint={field.hint}
+                readOnly={field.readOnly}
                 value={draft[field.key] ?? ""}
                 onChange={(e) => setDraft((p) => ({ ...p, [field.key]: e.target.value }))}
               />

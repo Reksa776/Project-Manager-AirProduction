@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { jobs } from "./jobs";
+import { crew } from "./crew";
 import { timestamps } from "./_shared";
 
 /**
@@ -24,6 +25,8 @@ export const deliveries = pgTable(
     name: varchar("name", { length: 160 }).notNull(),
     deliveryType: varchar("delivery_type", { length: 40 }),
     quantity: integer("quantity"),
+    photoEditorId: varchar("photo_editor_id", { length: 36 }).references(() => crew.id, { onDelete: "set null" }),
+    videoEditorId: varchar("video_editor_id", { length: 36 }).references(() => crew.id, { onDelete: "set null" }),
     deadline: date("deadline", { mode: "string" }).notNull(),
     status: varchar("status", { length: 20 }).notNull(),
     deliveredAt: date("delivered_at", { mode: "string" }),

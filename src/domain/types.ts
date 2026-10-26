@@ -119,6 +119,7 @@ export interface Package {
   name: string;
   description?: string;
   price?: Amount;
+  vendorPrice?: Amount;
   deliverables?: string;
   sortOrder: number;
   isActive: boolean;
@@ -178,6 +179,8 @@ export interface Delivery {
   name: string;
   deliveryType?: string;
   quantity?: number;
+  photoEditorId?: string;
+  videoEditorId?: string;
   deadline: string;
   status: DeliveryStatus;
   deliveredAt?: string;

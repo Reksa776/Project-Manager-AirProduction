@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import type { ClientPaymentTerm, VendorPaymentType } from "@/domain/types";
 import { isClientPaymentTerm, isVendorPaymentType } from "@/domain/validation";
 import { parseAmountInput } from "@/lib/utils";
+import { compareAmounts, fromMinorUnits, sumAmounts, toMinorUnits } from "@/domain/money";
 import {
   createClientSchedule,
   createVendorSchedule,
@@ -160,6 +161,9 @@ export async function recordClientPaymentAction(
   return run(async () => {
     const scheduleId = values.scheduleId?.trim();
     if (!scheduleId) throw new Error("Please select a client payment schedule.");
+    const app = getApplication();
+    const selectedSchedule = await app.repositories.clientPaymentSchedules.getById(scheduleId);
+    if (!selectedSchedule) throw new Error("Client payment schedule tidak ditemukan.");
     await recordClientPayment({
       scheduleId,
       amount: requireAmount(values, "Amount"),
@@ -167,9 +171,41 @@ export async function recordClientPaymentAction(
       description: values.description?.trim() || undefined,
       idempotencyKey: requireIdempotencyKey(values),
     });
-    const schedule = await getApplication().repositories.clientPaymentSchedules.getById(scheduleId);
-    return schedule?.jobId;
+    if (selectedSchedule.term === "TERMIN_1") await adjustClientInstallmentsAfterDeposit(selectedSchedule.jobId);
+    return selectedSchedule.jobId;
   });
+}
+
+async function adjustClientInstallmentsAfterDeposit(jobId: string): Promise<void> {
+  const app = getApplication();
+  const schedules = await app.repositories.clientPaymentSchedules.getByJobId(jobId);
+  const deposit = schedules.find((schedule) => schedule.term === "TERMIN_1");
+  const second = schedules.find((schedule) => schedule.term === "TERMIN_2");
+  const final = schedules.find((schedule) => schedule.term === "TERMIN_3");
+  if (!deposit || !second || !final) return;
+  const cashflows = await app.repositories.cashflows.getByJobId(jobId);
+  const paidBySchedule = (scheduleId: string) => sumAmounts(cashflows
+    .filter((flow) => flow.referenceType === "client_payment" && flow.referenceId === scheduleId)
+    .map((flow) => flow.amount));
+  const depositPaid = paidBySchedule(deposit.id);
+  if (compareAmounts(depositPaid, deposit.amount) <= 0) return;
+
+  const originalTotal = sumAmounts(schedules.map((schedule) => schedule.amount));
+  const secondPaid = paidBySchedule(second.id);
+  const finalPaid = paidBySchedule(final.id);
+  const nextAmount = toMinorUnits(second.amount);
+  const minimumRemaining = toMinorUnits(secondPaid) + toMinorUnits(finalPaid);
+  const remainingAfterDeposit = toMinorUnits(originalTotal) - toMinorUnits(depositPaid);
+  const availableForFuture = remainingAfterDeposit > minimumRemaining ? remainingAfterDeposit : minimumRemaining;
+  const roomForSecond = availableForFuture - toMinorUnits(finalPaid);
+  const cappedSecond = nextAmount < roomForSecond ? nextAmount : roomForSecond;
+  const adjustedSecond = cappedSecond > toMinorUnits(secondPaid) ? cappedSecond : toMinorUnits(secondPaid);
+  const adjustedFinal = availableForFuture - adjustedSecond;
+  await updateClientSchedule(deposit.id, { ...deposit, amount: depositPaid });
+  if (adjustedSecond <= BigInt(0)) await app.repositories.clientPaymentSchedules.delete(second.id);
+  else await updateClientSchedule(second.id, { ...second, amount: fromMinorUnits(adjustedSecond) });
+  if (adjustedFinal <= BigInt(0)) await app.repositories.clientPaymentSchedules.delete(final.id);
+  else await updateClientSchedule(final.id, { ...final, amount: fromMinorUnits(adjustedFinal) });
 }
 
 export async function recordVendorPaymentAction(

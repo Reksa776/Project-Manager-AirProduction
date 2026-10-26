@@ -37,9 +37,9 @@ export default async function JobsPage() {
       />
       <JobsTable
         jobs={jobs}
-        clients={clients.map(({ id, name, packageId, eventDate }) => ({ id, name, packageId, eventDate }))}
+        clients={clients.map(({ id, name, cpw, cpp, packageId, eventDate }) => ({ id, name, cpw, cpp, packageId, eventDate }))}
         vendors={vendors}
-        packages={packages.map(({ id, name, price, deliverables }) => ({ id, name, price: price ? formatCurrency(price) : undefined, deliverables }))}
+        packages={packages.map(({ id, name, price, vendorPrice, deliverables }) => ({ id, name, price: price ? formatCurrency(price) : undefined, vendorPrice: vendorPrice ? formatCurrency(vendorPrice) : undefined, deliverables }))}
         createAction={createJobAction}
         updateAction={updateJobAction}
         deleteAction={deleteJobAction}

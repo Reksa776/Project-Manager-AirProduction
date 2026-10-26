@@ -215,6 +215,9 @@ export function JobDetailTabs({
   const [expenseDraft, setExpenseDraft] = useState<Record<string, string>>({});
 
   const crewRoleOptions = crewRoles.map((role) => ({ value: role.id, label: role.name }));
+  const crewWithRole = crew.map((member) => ({ member, role: crewRoles.find((role) => role.id === member.crewRoleId)?.name.toLowerCase() ?? "" }));
+  const photoEditors = crewWithRole.filter(({ role }) => role.includes("editor") || role.includes("foto") || role.includes("photo"));
+  const videoEditors = crewWithRole.filter(({ role }) => role.includes("video"));
 
   async function submit(
     action: () => Promise<{ ok: true } | { ok: false; error: string }>,
@@ -399,8 +402,8 @@ export function JobDetailTabs({
               onClick={() => {
                 setDeliveryDraft({
                   name: "",
-                  deliveryType: "",
-                  quantity: "",
+                  photoEditorId: "",
+                  videoEditorId: "",
                   deadline: "",
                   status: "NOT_STARTED",
                   notes: "",
@@ -423,8 +426,8 @@ export function JobDetailTabs({
                 <THead>
                   <TR>
                     <TH>Item</TH>
-                    <TH>Type</TH>
-                    <TH>Quantity</TH>
+                    <TH>Editor Foto</TH>
+                    <TH>Editor Video</TH>
                     <TH>Deadline</TH>
                     <TH>Status</TH>
                     <TH>Actions</TH>
@@ -434,8 +437,8 @@ export function JobDetailTabs({
                   {detail.deliveries.map((delivery) => (
                     <TR key={delivery.id}>
                       <TD className="font-medium text-ink">{delivery.name}</TD>
-                      <TD>{delivery.deliveryType ?? "-"}</TD>
-                      <TD className="tabular-nums">{delivery.quantity ?? "-"}</TD>
+                      <TD>{crew.find((item) => item.id === delivery.photoEditorId)?.name ?? "-"}</TD>
+                      <TD>{crew.find((item) => item.id === delivery.videoEditorId)?.name ?? "-"}</TD>
                       <TD className="whitespace-nowrap">{formatShortDate(delivery.deadline)}</TD>
                       <TD>
                         <DeliveryStatusBadge status={delivery.status} />
@@ -449,8 +452,8 @@ export function JobDetailTabs({
                             onClick={() => {
                               setDeliveryDraft({
                                 name: delivery.name,
-                                deliveryType: delivery.deliveryType ?? "",
-                                quantity: delivery.quantity === undefined ? "" : String(delivery.quantity),
+                                photoEditorId: delivery.photoEditorId ?? "",
+                                videoEditorId: delivery.videoEditorId ?? "",
                                 deadline: delivery.deadline,
                                 status: delivery.status,
                                 notes: delivery.notes ?? "",
@@ -498,12 +501,6 @@ export function JobDetailTabs({
                 }}>
                   Record Client Payment
                 </Button>
-                <Button size="sm" variant="primary" onClick={() => {
-                  setClientScheduleDraft({ term: "TERMIN_1", amount: "", dueDate: "", notes: "" });
-                  setClientScheduleModal({ open: true, id: null });
-                }}>
-                  Add Schedule
-                </Button>
               </div>
             </div>
             {detail.clientSchedules.length === 0 ? (
@@ -518,7 +515,6 @@ export function JobDetailTabs({
                       <TH>Paid</TH>
                       <TH>Due Date</TH>
                       <TH>Status</TH>
-                      <TH>Actions</TH>
                     </TR>
                   </THead>
                   <TBody>
@@ -536,24 +532,6 @@ export function JobDetailTabs({
                           <Badge tone={paymentTone[schedule.status]}>
                             {PAYMENT_STATUS_LABEL[schedule.status]}
                           </Badge>
-                        </TD>
-                        <TD>
-                          <button
-                            type="button"
-                            className="text-[13px] text-brand hover:underline"
-                            disabled={busy}
-                            onClick={() => {
-                              setClientScheduleDraft({
-                                term: schedule.term,
-                                amount: schedule.amount,
-                                dueDate: schedule.dueDate ?? "",
-                                notes: schedule.notes ?? "",
-                              });
-                              setClientScheduleModal({ open: true, id: schedule.id });
-                            }}
-                          >
-                            Edit
-                          </button>
                         </TD>
                       </TR>
                     ))}
@@ -577,12 +555,6 @@ export function JobDetailTabs({
                 }}>
                   Record Vendor Payment
                 </Button>
-                <Button size="sm" variant="primary" onClick={() => {
-                  setVendorScheduleDraft({ type: "DP", amount: "", dueDate: "", notes: "" });
-                  setVendorScheduleModal({ open: true, id: null });
-                }}>
-                  Add Schedule
-                </Button>
               </div>
             </div>
             {detail.vendorSchedules.length === 0 ? (
@@ -597,7 +569,6 @@ export function JobDetailTabs({
                       <TH>Paid</TH>
                       <TH>Due Date</TH>
                       <TH>Status</TH>
-                      <TH>Actions</TH>
                     </TR>
                   </THead>
                   <TBody>
@@ -615,24 +586,6 @@ export function JobDetailTabs({
                           <Badge tone={paymentTone[schedule.status]}>
                             {PAYMENT_STATUS_LABEL[schedule.status]}
                           </Badge>
-                        </TD>
-                        <TD>
-                          <button
-                            type="button"
-                            className="text-[13px] text-brand hover:underline"
-                            disabled={busy}
-                            onClick={() => {
-                              setVendorScheduleDraft({
-                                type: schedule.type,
-                                amount: schedule.amount,
-                                dueDate: schedule.dueDate ?? "",
-                                notes: schedule.notes ?? "",
-                              });
-                              setVendorScheduleModal({ open: true, id: schedule.id });
-                            }}
-                          >
-                            Edit
-                          </button>
                         </TD>
                       </TR>
                     ))}
@@ -798,8 +751,8 @@ export function JobDetailTabs({
       >
         <div className="space-y-4">
           <Input label="Item Name" value={deliveryDraft.name ?? ""} onChange={(e) => setDeliveryDraft((p) => ({ ...p, name: e.target.value }))} />
-          <Input label="Delivery Type" hint="Mis: VIDEO, PHOTO, ALBUM" value={deliveryDraft.deliveryType ?? ""} onChange={(e) => setDeliveryDraft((p) => ({ ...p, deliveryType: e.target.value }))} />
-          <Input label="Quantity" inputMode="numeric" value={deliveryDraft.quantity ?? ""} onChange={(e) => setDeliveryDraft((p) => ({ ...p, quantity: e.target.value }))} />
+          <Select label="Editor Foto" options={photoEditors.map(({ member }) => ({ value: member.id, label: member.name }))} placeholder="Belum ditentukan" value={deliveryDraft.photoEditorId ?? ""} onChange={(e) => setDeliveryDraft((p) => ({ ...p, photoEditorId: e.target.value }))} />
+          <Select label="Editor Video" options={videoEditors.map(({ member }) => ({ value: member.id, label: member.name }))} placeholder="Belum ditentukan" value={deliveryDraft.videoEditorId ?? ""} onChange={(e) => setDeliveryDraft((p) => ({ ...p, videoEditorId: e.target.value }))} />
           <Input label="Deadline" type="date" value={deliveryDraft.deadline ?? ""} onChange={(e) => setDeliveryDraft((p) => ({ ...p, deadline: e.target.value }))} />
           <Select label="Status" options={deliveryStatusOptions} value={deliveryDraft.status ?? "NOT_STARTED"} onChange={(e) => setDeliveryDraft((p) => ({ ...p, status: e.target.value }))} />
         </div>

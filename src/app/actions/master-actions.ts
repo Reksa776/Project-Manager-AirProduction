@@ -104,10 +104,14 @@ export async function deleteClientAction(id: string): Promise<MasterActionResult
 
 function packageInputFrom(values: Record<string, string>) {
   const price = parseAmountInput(values.price);
-  if (price === null) throw new Error("Isi harga paket dengan angka yang valid.");
+  const vendorPrice = values.vendorPrice?.trim() ? parseAmountInput(values.vendorPrice) : null;
+  if (values.price?.trim() && price === null) throw new Error("Isi harga paket dengan angka yang valid.");
+  if (values.vendorPrice?.trim() && vendorPrice === null) throw new Error("Isi harga vendor dengan angka yang valid.");
+  if (price === null && vendorPrice === null) throw new Error("Isi harga client atau harga vendor.");
   return {
     name: requireText(values, "name", "Package name"),
-    price,
+    price: price ?? undefined,
+    vendorPrice: vendorPrice ?? undefined,
     deliverables: optionalText(values, "deliverables"),
   };
 }

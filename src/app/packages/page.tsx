@@ -21,6 +21,8 @@ export default async function PackagesPage() {
     name: item.name,
     price: item.price ?? "",
     priceLabel: item.price ? formatCurrency(item.price) : "",
+    vendorPrice: item.vendorPrice ?? "",
+    vendorPriceLabel: item.vendorPrice ? formatCurrency(item.vendorPrice) : "",
     deliverables: item.deliverables?.split(/\r?\n/).filter(Boolean).join(" • ") ?? "",
   }));
 
@@ -40,12 +42,14 @@ export default async function PackagesPage() {
           columns={[
             { key: "name", label: "Package Name" },
             { key: "priceLabel", label: "Price" },
+            { key: "vendorPriceLabel", label: "Vendor Price" },
             { key: "deliverables", label: "Deliverables" },
           ]}
           rows={rows}
           fields={[
             { key: "name", label: "Package Name", required: true },
-            { key: "price", label: "Price", type: "number", required: true },
+            { key: "price", label: "Harga Client (opsional)", type: "number" },
+            { key: "vendorPrice", label: "Harga Vendor (opsional)", type: "number" },
             { key: "deliverables", label: "Daftar deliverable", type: "repeatable", hint: "Setiap input menjadi satu item Delivery di job." },
           ]}
           createAction={createPackageAction}

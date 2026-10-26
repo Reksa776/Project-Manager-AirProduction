@@ -5,7 +5,6 @@ import { SummaryCard } from "@/components/dashboard/summary-card";
 import {
   Card,
   CardHeader,
-  DeliveryStatusBadge,
   EmptyState,
   JobStatusBadge,
   PageHeader,
@@ -144,14 +143,13 @@ export default async function DashboardPage() {
               <THead>
                 <TR>
                   <TH>Project</TH>
-                  <TH>Delivery</TH>
-                  <TH>Deadline</TH>
-                  <TH>Status</TH>
+                  <TH>Progres Delivery</TH>
+                  <TH>Deadline Berikutnya</TH>
                 </TR>
               </THead>
               <TBody>
                 {projectMonitoring.map((item) => (
-                  <TR key={item.deliveryId}>
+                  <TR key={item.jobNumber}>
                     <TD>
                       <Link
                         href={`/jobs/${item.jobNumber}`}
@@ -163,14 +161,16 @@ export default async function DashboardPage() {
                         {item.jobNumber}
                       </p>
                     </TD>
-                    <TD className="max-w-56 break-words">{item.deliveryName}</TD>
                     <TD className="whitespace-nowrap">
-                      <span className="font-medium text-ink">{formatShortDate(item.deadline)}</span>
-                      <span className="ml-1.5 text-[12px] text-ink-muted">{formatCountdown(item.deadline)}</span>
+                      <div className="flex items-center gap-3">
+                        <div className="h-2 w-28 overflow-hidden rounded-full bg-[#e9edf2]">
+                          <div className="h-full rounded-full bg-brand" style={{ width: `${item.progressPercent}%` }} />
+                        </div>
+                        <span className="tabular-nums">{item.progressPercent}%</span>
+                        <span className="text-xs text-ink-muted">{item.completedDeliveries}/{item.totalDeliveries}</span>
+                      </div>
                     </TD>
-                    <TD>
-                      <DeliveryStatusBadge status={item.status} />
-                    </TD>
+                    <TD>{item.nextDeadline ? <><span className="font-medium text-ink">{formatShortDate(item.nextDeadline)}</span><span className="ml-1.5 text-[12px] text-ink-muted">{formatCountdown(item.nextDeadline)}</span></> : <span className="text-emerald-700">Semua selesai</span>}</TD>
                   </TR>
                 ))}
               </TBody>

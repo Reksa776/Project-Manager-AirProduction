@@ -8,20 +8,15 @@ import {
   CLIENT_PAYMENT_TERM_LABEL,
   GENERAL_EXPENSE_CATEGORIES,
   PAYMENT_STATUS_LABEL,
-  VENDOR_PAYMENT_TYPE_LABEL,
 } from "@/lib/labels";
 import {
-  createClientScheduleAction,
-  createVendorScheduleAction,
   recordClientPaymentAction,
   recordExpenseAction,
   recordVendorPaymentAction,
-  updateClientScheduleAction,
-  updateVendorScheduleAction,
 } from "@/app/actions/finance-actions";
 import { getJobListItems, getFinanceOverview } from "@/services/job-service";
 import { formatCurrency } from "@/lib/utils";
-import { sumAmounts, subtractAmounts } from "@/domain/money";
+import { sumAmounts, subtractAmounts, compareAmounts } from "@/domain/money";
 import type { ClientScheduleView, VendorScheduleView } from "@/services/types";
 import { requireAuthenticatedAdmin } from "@/lib/auth";
 
@@ -31,14 +26,6 @@ export const metadata = {
 
 // Data MySQL dibaca saat runtime; tidak diprerender statis.
 export const dynamic = "force-dynamic";
-
-const CLIENT_TERM_OPTIONS = (
-  Object.keys(CLIENT_PAYMENT_TERM_LABEL) as Array<keyof typeof CLIENT_PAYMENT_TERM_LABEL>
-).map((value) => ({ value, label: CLIENT_PAYMENT_TERM_LABEL[value] }));
-
-const VENDOR_TYPE_OPTIONS = (
-  Object.keys(VENDOR_PAYMENT_TYPE_LABEL) as Array<keyof typeof VENDOR_PAYMENT_TYPE_LABEL>
-).map((value) => ({ value, label: VENDOR_PAYMENT_TYPE_LABEL[value] }));
 
 const EXPENSE_CATEGORY_OPTIONS = GENERAL_EXPENSE_CATEGORIES.map((value) => ({
   value,
@@ -81,25 +68,13 @@ export default async function FinancePage() {
     value: job.id,
     label: `${job.jobNumber} — ${job.jobName}`,
   }));
+  const jobById = new Map(jobs.map((job) => [job.id, job]));
 
   const clientScheduleRows = overview.clientSchedules.map((schedule) => ({
     id: schedule.id,
     jobId: schedule.jobId,
     term: schedule.term,
     termLabel: CLIENT_PAYMENT_TERM_LABEL[schedule.term],
-    amount: schedule.amount,
-    amountLabel: formatCurrency(schedule.amount),
-    paidLabel: formatCurrency(schedule.paidAmount),
-    dueDate: schedule.dueDate ?? "",
-    statusLabel: PAYMENT_STATUS_LABEL[schedule.status],
-    notes: schedule.notes ?? "",
-  }));
-
-  const vendorScheduleRows = overview.vendorSchedules.map((schedule) => ({
-    id: schedule.id,
-    jobId: schedule.jobId,
-    type: schedule.type,
-    typeLabel: VENDOR_PAYMENT_TYPE_LABEL[schedule.type],
     amount: schedule.amount,
     amountLabel: formatCurrency(schedule.amount),
     paidLabel: formatCurrency(schedule.paidAmount),
@@ -118,15 +93,23 @@ export default async function FinancePage() {
     jobLabel: flow.jobLabel,
   }));
 
-  const clientScheduleOptions = overview.clientSchedules.map((schedule) => ({
-    value: schedule.id,
-    label: `${schedule.jobId.slice(0, 8)} · ${CLIENT_PAYMENT_TERM_LABEL[schedule.term]} — ${formatCurrency(schedule.amount)} (${PAYMENT_STATUS_LABEL[schedule.status]})`,
-  }));
+  const clientScheduleAmounts: Record<string, string> = {};
+  const clientScheduleOptions = overview.clientSchedules.flatMap((schedule) => {
+    const job = jobById.get(schedule.jobId);
+    if (!job || compareAmounts(schedule.amount, schedule.paidAmount) <= 0) return [];
+    const remaining = subtractAmounts(schedule.amount, schedule.paidAmount);
+    clientScheduleAmounts[schedule.id] = remaining;
+    return [{ value: schedule.id, label: `${job.counterparty.name} · ${job.jobName} · ${CLIENT_PAYMENT_TERM_LABEL[schedule.term]} · ${formatCurrency(remaining)}` }];
+  });
 
-  const vendorScheduleOptions = overview.vendorSchedules.map((schedule) => ({
-    value: schedule.id,
-    label: `${schedule.jobId.slice(0, 8)} · ${VENDOR_PAYMENT_TYPE_LABEL[schedule.type]} — ${formatCurrency(schedule.amount)} (${PAYMENT_STATUS_LABEL[schedule.status]})`,
-  }));
+  const vendorScheduleAmounts: Record<string, string> = {};
+  const vendorScheduleOptions = overview.vendorSchedules.flatMap((schedule) => {
+    const job = jobById.get(schedule.jobId);
+    if (!job || compareAmounts(schedule.amount, schedule.paidAmount) <= 0) return [];
+    const remaining = subtractAmounts(schedule.amount, schedule.paidAmount);
+    vendorScheduleAmounts[schedule.id] = remaining;
+    return [{ value: schedule.id, label: `${job.counterparty.name} · ${job.jobName} · ${schedule.notes ?? schedule.type} · ${formatCurrency(remaining)}` }];
+  });
 
   return (
     <AppShell adminName={admin.name}>
@@ -139,13 +122,12 @@ export default async function FinancePage() {
 
       <ReceivableSummary
         receivables={buildPaymentSummary(overview.clientSchedules)}
-        payables={buildPaymentSummary(overview.vendorSchedules)}
       />
 
-      {/* Obligations: schedules (create + update; canonical has no schedule delete) */}
+      {/* Automatically generated client obligations, read-only here. */}
       <FinanceCrud
         title="Client Billing Schedule"
-        description="Client billing schedule (Installment 1 = deposit; Installment 3 = final payment). Status is derived from cash records."
+        description="Schedule dibuat otomatis saat job disimpan: DP minimal 10%, pembayaran kedua 40%, pelunasan pada H+3."
         entityLabel="Client Schedule"
         columns={[
           { key: "termLabel", label: "Installment" },
@@ -155,60 +137,24 @@ export default async function FinancePage() {
           { key: "statusLabel", label: "Status" },
         ]}
         rows={clientScheduleRows}
-        fields={[
-          { key: "jobId", label: "Job", type: "select", options: jobOptions, placeholder: "-- Select Job --" },
-          { key: "term", label: "Installment", type: "select", options: CLIENT_TERM_OPTIONS, defaultValue: "TERMIN_1" },
-          { key: "amount", label: "Amount", type: "number", hint: "Example: 1,000,000" },
-          { key: "dueDate", label: "Due Date (optional)", type: "date" },
-          { key: "notes", label: "Notes", type: "textarea" },
-        ]}
+        fields={[]}
         totals={[
           { label: "Total Client Obligation", value: formatCurrency(
             overview.clientSchedules.reduce((sum, s) => sum + Number(s.amount), 0),
           ) },
         ]}
-        createAction={createClientScheduleAction}
-        updateAction={updateClientScheduleAction}
-      />
-
-      <FinanceCrud
-        title="Vendor Payment Schedule"
-        description="Vendor payment schedule (deposit and final payment). Status is derived from cash records."
-        entityLabel="Vendor Schedule"
-        columns={[
-          { key: "typeLabel", label: "Type" },
-          { key: "amountLabel", label: "Scheduled Amount" },
-          { key: "paidLabel", label: "Paid" },
-          { key: "dueDate", label: "Due Date" },
-          { key: "statusLabel", label: "Status" },
-        ]}
-        rows={vendorScheduleRows}
-        fields={[
-          { key: "jobId", label: "Job", type: "select", options: jobOptions, placeholder: "-- Select Job --" },
-          { key: "type", label: "Type", type: "select", options: VENDOR_TYPE_OPTIONS, defaultValue: "Deposit" },
-          { key: "amount", label: "Amount", type: "number", hint: "Example: 400,000" },
-          { key: "dueDate", label: "Due Date (optional)", type: "date" },
-          { key: "notes", label: "Notes", type: "textarea" },
-        ]}
-        totals={[
-          { label: "Total Vendor Obligation", value: formatCurrency(
-            overview.vendorSchedules.reduce((sum, s) => sum + Number(s.amount), 0),
-          ) },
-        ]}
-        createAction={createVendorScheduleAction}
-        updateAction={updateVendorScheduleAction}
       />
 
       {/* Actual cash: create-only, idempotent, no edit/delete (canonical cashflow) */}
       <FinanceCrud
-        title="Record Income (Payment Client)"
+        title="Record Client Billing Payment"
         description="Record actual client payments. The database prevents duplicate entries; cash records cannot be edited or deleted."
         entityLabel="Client Payment"
         columns={[{ key: "occurredOn", label: "Date" }]}
         rows={[]}
         fields={[
-          { key: "scheduleId", label: "Client Schedule", type: "select", options: clientScheduleOptions, placeholder: "-- Select Schedule --" },
-          { key: "amount", label: "Amount", type: "number", hint: "Example: 500,000" },
+          { key: "scheduleId", label: "Client / Job / Termin", type: "select", options: clientScheduleOptions, amountByOption: clientScheduleAmounts, placeholder: "-- Select Schedule --" },
+          { key: "amount", label: "Amount", type: "number", hint: "Terisi otomatis dari schedule; ubah jika DP client dibayar lebih besar." },
           { key: "occurredOn", label: "Date", type: "date" },
           { key: "description", label: "Description (optional)" },
           { key: "idempotencyKey", label: "Idempotency Key", type: "hidden", autoKey: true },
@@ -217,14 +163,14 @@ export default async function FinancePage() {
       />
 
       <FinanceCrud
-        title="Record Vendor Payment"
+        title="Vendor Billing Payment"
         description="Record actual vendor payments. Cash records cannot be edited or deleted."
         entityLabel="Vendor Payment"
         columns={[{ key: "occurredOn", label: "Date" }]}
         rows={[]}
         fields={[
-          { key: "scheduleId", label: "Vendor Schedule", type: "select", options: vendorScheduleOptions, placeholder: "-- Select Schedule --" },
-          { key: "amount", label: "Amount", type: "number", hint: "Example: 400,000" },
+          { key: "scheduleId", label: "Vendor / Job / Termin", type: "select", options: vendorScheduleOptions, amountByOption: vendorScheduleAmounts, placeholder: "-- Select Schedule --" },
+          { key: "amount", label: "Amount (sisa tagihan)", type: "number", readOnly: true, hint: "Terisi otomatis dari sisa schedule yang dipilih." },
           { key: "occurredOn", label: "Date", type: "date" },
           { key: "description", label: "Description (optional)" },
           { key: "idempotencyKey", label: "Idempotency Key", type: "hidden", autoKey: true },

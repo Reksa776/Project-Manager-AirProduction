@@ -53,6 +53,7 @@ function jobInputFrom(values: Record<string, string>): JobInput {
     clientId: counterpartyType === "CLIENT" ? counterpartyId : undefined,
     vendorId: counterpartyType === "VENDOR" ? counterpartyId : undefined,
     packageId: values.packageId?.trim() || undefined,
+    vendorInstallments: ["1", "2", "3"].includes(values.vendorInstallments) ? Number(values.vendorInstallments) : 1,
     executionDate,
     status: "NOT_STARTED",
     location: values.location?.trim() || undefined,
