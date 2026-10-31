@@ -50,6 +50,13 @@
       "when": 1793025652885,
       "tag": "0006_burly_living_tribunal",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793454271997,
+      "tag": "0007_flippant_pete_wisdom",
+      "breakpoints": true
     }
   ]
 }

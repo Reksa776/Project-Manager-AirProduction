@@ -108,6 +108,7 @@ export function JobsTable({
       counterpartyId: job.counterparty.id,
       cpw: job.cpw ?? "", cpp: job.cpp ?? "",
       packageId: job.packageId ?? "",
+      vendorInstallments: "1",
       executionDate: job.executionDate, location: job.location ?? "", notes: job.notes ?? "",
     });
     setModalError(null);
@@ -333,7 +334,10 @@ export function JobsTable({
             {draft.counterpartyType === "CLIENT" ? <>
               <Input label="Nama CPW" value={selectedClient?.cpw ?? draft.cpw ?? ""} readOnly />
               <Input label="Nama CPP" value={selectedClient?.cpp ?? draft.cpp ?? ""} readOnly />
-            </> : null}
+            </> : <>
+              <Input label="Nama CPW" value={draft.cpw ?? ""} onChange={(e) => setDraft((p) => ({ ...p, cpw: e.target.value }))} />
+              <Input label="Nama CPP" value={draft.cpp ?? ""} onChange={(e) => setDraft((p) => ({ ...p, cpp: e.target.value }))} />
+            </>}
             <Input label="Event Date" type="date" value={draft.executionDate ?? ""} onChange={(e) => setDraft((p) => ({ ...p, executionDate: e.target.value }))} />
             <Input label="Location" value={draft.location ?? ""} onChange={(e) => setDraft((p) => ({ ...p, location: e.target.value }))} />
           </div>

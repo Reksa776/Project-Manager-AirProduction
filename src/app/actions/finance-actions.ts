@@ -182,7 +182,7 @@ async function adjustClientInstallmentsAfterDeposit(jobId: string): Promise<void
   const deposit = schedules.find((schedule) => schedule.term === "TERMIN_1");
   const second = schedules.find((schedule) => schedule.term === "TERMIN_2");
   const final = schedules.find((schedule) => schedule.term === "TERMIN_3");
-  if (!deposit || !second || !final) return;
+  if (!deposit || !final) return;
   const cashflows = await app.repositories.cashflows.getByJobId(jobId);
   const paidBySchedule = (scheduleId: string) => sumAmounts(cashflows
     .filter((flow) => flow.referenceType === "client_payment" && flow.referenceId === scheduleId)
@@ -190,20 +190,25 @@ async function adjustClientInstallmentsAfterDeposit(jobId: string): Promise<void
   const depositPaid = paidBySchedule(deposit.id);
   if (compareAmounts(depositPaid, deposit.amount) <= 0) return;
 
-  const originalTotal = sumAmounts(schedules.map((schedule) => schedule.amount));
-  const secondPaid = paidBySchedule(second.id);
+  const excess = toMinorUnits(depositPaid) - toMinorUnits(deposit.amount);
+  const secondPaid = second ? paidBySchedule(second.id) : "0.00";
   const finalPaid = paidBySchedule(final.id);
-  const nextAmount = toMinorUnits(second.amount);
-  const minimumRemaining = toMinorUnits(secondPaid) + toMinorUnits(finalPaid);
-  const remainingAfterDeposit = toMinorUnits(originalTotal) - toMinorUnits(depositPaid);
-  const availableForFuture = remainingAfterDeposit > minimumRemaining ? remainingAfterDeposit : minimumRemaining;
-  const roomForSecond = availableForFuture - toMinorUnits(finalPaid);
-  const cappedSecond = nextAmount < roomForSecond ? nextAmount : roomForSecond;
-  const adjustedSecond = cappedSecond > toMinorUnits(secondPaid) ? cappedSecond : toMinorUnits(secondPaid);
-  const adjustedFinal = availableForFuture - adjustedSecond;
+  const secondAmount = second ? toMinorUnits(second.amount) : BigInt(0);
+  const secondPaidMinor = toMinorUnits(secondPaid);
+  const rawSecondOutstanding = secondAmount - secondPaidMinor;
+  const secondOutstanding = rawSecondOutstanding > BigInt(0) ? rawSecondOutstanding : BigInt(0);
+  const reduceSecondBy = excess < secondOutstanding ? excess : secondOutstanding;
+  const adjustedSecond = secondAmount - reduceSecondBy;
+  const excessAfterSecond = excess - reduceSecondBy;
+  const rawFinalOutstanding = toMinorUnits(final.amount) - toMinorUnits(finalPaid);
+  const finalOutstanding = rawFinalOutstanding > BigInt(0) ? rawFinalOutstanding : BigInt(0);
+  const reduceFinalBy = excessAfterSecond < finalOutstanding ? excessAfterSecond : finalOutstanding;
+  const adjustedFinal = toMinorUnits(final.amount) - reduceFinalBy;
   await updateClientSchedule(deposit.id, { ...deposit, amount: depositPaid });
-  if (adjustedSecond <= BigInt(0)) await app.repositories.clientPaymentSchedules.delete(second.id);
-  else await updateClientSchedule(second.id, { ...second, amount: fromMinorUnits(adjustedSecond) });
+  if (second) {
+    if (adjustedSecond <= BigInt(0) && secondPaidMinor <= BigInt(0)) await app.repositories.clientPaymentSchedules.delete(second.id);
+    else await updateClientSchedule(second.id, { ...second, amount: fromMinorUnits(adjustedSecond) });
+  }
   if (adjustedFinal <= BigInt(0)) await app.repositories.clientPaymentSchedules.delete(final.id);
   else await updateClientSchedule(final.id, { ...final, amount: fromMinorUnits(adjustedFinal) });
 }

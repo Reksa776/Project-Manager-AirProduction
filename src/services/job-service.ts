@@ -147,10 +147,10 @@ export async function getJobListItems(
       ? {
           ...counterparty,
           name: [clientMap.get(counterparty.id)?.cpw, clientMap.get(counterparty.id)?.cpp].filter(Boolean).join(" & ") || counterparty.name,
-          cpw: clientMap.get(counterparty.id)?.cpw,
-          cpp: clientMap.get(counterparty.id)?.cpp,
+          cpw: job.cpw ?? clientMap.get(counterparty.id)?.cpw,
+          cpp: job.cpp ?? clientMap.get(counterparty.id)?.cpp,
         }
-      : counterparty;
+      : { ...counterparty, cpw: job.cpw, cpp: job.cpp };
     items.push({
       id: job.id,
       jobNumber: job.jobNumber,
@@ -239,13 +239,13 @@ async function resolveJobCounterparty(job: Job): Promise<Counterparty> {
       type: "CLIENT",
       id: job.clientId,
       name: [client?.cpw, client?.cpp].filter(Boolean).join(" & ") || client?.name || "Client tidak dikenal",
-      cpw: client?.cpw,
-      cpp: client?.cpp,
+      cpw: job.cpw ?? client?.cpw,
+      cpp: job.cpp ?? client?.cpp,
     };
   }
   if (job.vendorId) {
     const vendor = await app.services.master.getVendor(job.vendorId);
-    return { type: "VENDOR", id: job.vendorId, name: vendor?.name ?? "Vendor tidak dikenal" };
+    return { type: "VENDOR", id: job.vendorId, name: vendor?.name ?? "Vendor tidak dikenal", cpw: job.cpw, cpp: job.cpp };
   }
   throw new Error(
     `Job '${job.jobNumber}' tidak memiliki client maupun vendor (melanggar aturan XOR).`,
@@ -332,6 +332,8 @@ export interface JobInput {
   category: JobCategory;
   clientId?: string;
   vendorId?: string;
+  cpw?: string;
+  cpp?: string;
   packageId?: string;
   executionDate: string;
   status: JobStatus;
@@ -477,6 +479,8 @@ function normalizeJobInput(input: JobInput): CreateJobInput {
     category: input.category,
     clientId: hasValue(input.clientId) ? input.clientId : undefined,
     vendorId: hasValue(input.vendorId) ? input.vendorId : undefined,
+    cpw: hasValue(input.cpw) ? input.cpw.trim() : undefined,
+    cpp: hasValue(input.cpp) ? input.cpp.trim() : undefined,
     packageId: hasValue(input.packageId) ? input.packageId : undefined,
     executionDate: input.executionDate,
     status: input.status,

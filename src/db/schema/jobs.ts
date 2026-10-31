@@ -37,6 +37,8 @@ export const jobs = pgTable(
     vendorId: varchar("vendor_id", { length: 36 }).references(() => vendors.id, {
       onDelete: "restrict",
     }),
+    cpw: varchar("cpw", { length: 120 }),
+    cpp: varchar("cpp", { length: 120 }),
     executionDate: date("execution_date", { mode: "string" }).notNull(),
     status: varchar("status", { length: 20 }).notNull(),
     location: text("location"),

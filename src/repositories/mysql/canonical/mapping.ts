@@ -157,6 +157,8 @@ export function rowToCanonicalJob(row: JobRow): Job {
     category: requireEnum(row.category, isJobCategory, "jobs.category"),
     clientId: opt(row.clientId),
     vendorId: opt(row.vendorId),
+    cpw: opt(row.cpw),
+    cpp: opt(row.cpp),
     packageId: opt(row.packageId),
     executionDate: row.executionDate,
     status: row.executionDate < today ? "COMPLETED" : row.executionDate === today ? "IN_PROGRESS" : "NOT_STARTED",

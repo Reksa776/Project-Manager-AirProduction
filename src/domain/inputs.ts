@@ -76,6 +76,8 @@ export interface CreateJobInput {
   category: JobCategory;
   clientId?: string;
   vendorId?: string;
+  cpw?: string;
+  cpp?: string;
   packageId?: string;
   executionDate: string;
   status: JobStatus;

@@ -80,7 +80,7 @@ export default async function JobDetailPage({
           label={counterparty.type === "VENDOR" ? "Vendor" : "Client"}
           value={counterparty.name}
         />
-        {counterparty.type === "CLIENT" ? <>
+        {counterparty.cpw || counterparty.cpp ? <>
           <MetaItem label="CPW" value={counterparty.cpw ?? "-"} />
           <MetaItem label="CPP" value={counterparty.cpp ?? "-"} />
         </> : null}

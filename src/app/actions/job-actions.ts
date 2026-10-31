@@ -52,6 +52,8 @@ function jobInputFrom(values: Record<string, string>): JobInput {
     category,
     clientId: counterpartyType === "CLIENT" ? counterpartyId : undefined,
     vendorId: counterpartyType === "VENDOR" ? counterpartyId : undefined,
+    cpw: values.cpw?.trim() || undefined,
+    cpp: values.cpp?.trim() || undefined,
     packageId: values.packageId?.trim() || undefined,
     vendorInstallments: ["1", "2", "3"].includes(values.vendorInstallments) ? Number(values.vendorInstallments) : 1,
     executionDate,
