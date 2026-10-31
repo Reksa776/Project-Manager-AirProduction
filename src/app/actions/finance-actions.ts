@@ -12,6 +12,7 @@ import {
   recordClientPayment,
   recordExpense,
   recordVendorPayment,
+  rebalanceVendorPaymentSchedules,
   updateClientSchedule,
   updateVendorSchedule,
 } from "@/services/job-service";
@@ -219,6 +220,9 @@ export async function recordVendorPaymentAction(
   return run(async () => {
     const scheduleId = values.scheduleId?.trim();
     if (!scheduleId) throw new Error("Please select a vendor payment schedule.");
+    const app = getApplication();
+    const selectedSchedule = await app.repositories.vendorPaymentSchedules.getById(scheduleId);
+    if (!selectedSchedule) throw new Error("Vendor payment schedule tidak ditemukan.");
     await recordVendorPayment({
       scheduleId,
       amount: requireAmount(values, "Amount"),
@@ -226,8 +230,22 @@ export async function recordVendorPaymentAction(
       description: values.description?.trim() || undefined,
       idempotencyKey: requireIdempotencyKey(values),
     });
-    const schedule = await getApplication().repositories.vendorPaymentSchedules.getById(scheduleId);
-    return schedule?.jobId;
+    const [schedules, cashflows] = await Promise.all([
+      app.repositories.vendorPaymentSchedules.getByJobId(selectedSchedule.jobId),
+      app.repositories.cashflows.getByJobId(selectedSchedule.jobId),
+    ]);
+    const rebalanced = new Map(
+      rebalanceVendorPaymentSchedules(schedules, cashflows).map((schedule) => [schedule.id, schedule]),
+    );
+    for (const schedule of schedules) {
+      const adjusted = rebalanced.get(schedule.id);
+      if (!adjusted) {
+        await app.repositories.vendorPaymentSchedules.delete(schedule.id);
+      } else if (adjusted.amount !== schedule.amount) {
+        await updateVendorSchedule(schedule.id, { ...schedule, amount: adjusted.amount });
+      }
+    }
+    return selectedSchedule.jobId;
   });
 }
 
