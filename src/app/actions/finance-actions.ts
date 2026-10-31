@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 
-import type { ClientPaymentTerm, VendorPaymentType } from "@/domain/types";
+import type { Cashflow, ClientPaymentTerm, VendorPaymentType } from "@/domain/types";
 import { isClientPaymentTerm, isVendorPaymentType } from "@/domain/validation";
-import { parseAmountInput } from "@/lib/utils";
+import { formatCurrency, parseAmountInput } from "@/lib/utils";
 import { compareAmounts, fromMinorUnits, sumAmounts, toMinorUnits } from "@/domain/money";
 import {
   createClientSchedule,
@@ -12,6 +12,7 @@ import {
   recordClientPayment,
   recordExpense,
   recordVendorPayment,
+  rebalanceClientPaymentSchedules,
   rebalanceVendorPaymentSchedules,
   updateClientSchedule,
   updateVendorSchedule,
@@ -68,6 +69,24 @@ function requireIdempotencyKey(values: Record<string, string>): string {
   const key = values.idempotencyKey?.trim();
   if (!key) throw new Error("An idempotency key is required to record a cash movement.");
   return key;
+}
+
+function ensureWithinJobPaymentBalance(
+  schedules: ReadonlyArray<{ id: string; amount: string }>,
+  cashflows: readonly Cashflow[],
+  referenceType: "client_payment" | "vendor_payment",
+  amount: string,
+): void {
+  const scheduleIds = new Set(schedules.map((schedule) => schedule.id));
+  const paid = sumAmounts(cashflows
+    .filter((flow) => flow.referenceType === referenceType && flow.referenceId && scheduleIds.has(flow.referenceId))
+    .map((flow) => flow.amount));
+  const obligation = sumAmounts(schedules.map((schedule) => schedule.amount));
+  const remainingMinor = toMinorUnits(obligation) - toMinorUnits(paid);
+  const remaining = fromMinorUnits(remainingMinor > BigInt(0) ? remainingMinor : BigInt(0));
+  if (compareAmounts(amount, remaining) > 0) {
+    throw new Error(`Nominal pembayaran melebihi sisa harga paket. Maksimal yang dapat dicatat: ${formatCurrency(remaining)}.`);
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -165,53 +184,39 @@ export async function recordClientPaymentAction(
     const app = getApplication();
     const selectedSchedule = await app.repositories.clientPaymentSchedules.getById(scheduleId);
     if (!selectedSchedule) throw new Error("Client payment schedule tidak ditemukan.");
+    const amount = requireAmount(values, "Amount");
+    const [schedulesBeforePayment, cashflowsBeforePayment] = await Promise.all([
+      app.repositories.clientPaymentSchedules.getByJobId(selectedSchedule.jobId),
+      app.repositories.cashflows.getByJobId(selectedSchedule.jobId),
+    ]);
+    ensureWithinJobPaymentBalance(schedulesBeforePayment, cashflowsBeforePayment, "client_payment", amount);
     await recordClientPayment({
       scheduleId,
-      amount: requireAmount(values, "Amount"),
+      amount,
       occurredOn: requireDate(values, "occurredOn", "Payment date"),
       description: values.description?.trim() || undefined,
       idempotencyKey: requireIdempotencyKey(values),
     });
-    if (selectedSchedule.term === "TERMIN_1") await adjustClientInstallmentsAfterDeposit(selectedSchedule.jobId);
+    await rebalanceAndSaveClientSchedules(selectedSchedule.jobId);
     return selectedSchedule.jobId;
   });
 }
 
-async function adjustClientInstallmentsAfterDeposit(jobId: string): Promise<void> {
+async function rebalanceAndSaveClientSchedules(jobId: string): Promise<void> {
   const app = getApplication();
   const schedules = await app.repositories.clientPaymentSchedules.getByJobId(jobId);
-  const deposit = schedules.find((schedule) => schedule.term === "TERMIN_1");
-  const second = schedules.find((schedule) => schedule.term === "TERMIN_2");
-  const final = schedules.find((schedule) => schedule.term === "TERMIN_3");
-  if (!deposit || !final) return;
   const cashflows = await app.repositories.cashflows.getByJobId(jobId);
-  const paidBySchedule = (scheduleId: string) => sumAmounts(cashflows
-    .filter((flow) => flow.referenceType === "client_payment" && flow.referenceId === scheduleId)
-    .map((flow) => flow.amount));
-  const depositPaid = paidBySchedule(deposit.id);
-  if (compareAmounts(depositPaid, deposit.amount) <= 0) return;
-
-  const excess = toMinorUnits(depositPaid) - toMinorUnits(deposit.amount);
-  const secondPaid = second ? paidBySchedule(second.id) : "0.00";
-  const finalPaid = paidBySchedule(final.id);
-  const secondAmount = second ? toMinorUnits(second.amount) : BigInt(0);
-  const secondPaidMinor = toMinorUnits(secondPaid);
-  const rawSecondOutstanding = secondAmount - secondPaidMinor;
-  const secondOutstanding = rawSecondOutstanding > BigInt(0) ? rawSecondOutstanding : BigInt(0);
-  const reduceSecondBy = excess < secondOutstanding ? excess : secondOutstanding;
-  const adjustedSecond = secondAmount - reduceSecondBy;
-  const excessAfterSecond = excess - reduceSecondBy;
-  const rawFinalOutstanding = toMinorUnits(final.amount) - toMinorUnits(finalPaid);
-  const finalOutstanding = rawFinalOutstanding > BigInt(0) ? rawFinalOutstanding : BigInt(0);
-  const reduceFinalBy = excessAfterSecond < finalOutstanding ? excessAfterSecond : finalOutstanding;
-  const adjustedFinal = toMinorUnits(final.amount) - reduceFinalBy;
-  await updateClientSchedule(deposit.id, { ...deposit, amount: depositPaid });
-  if (second) {
-    if (adjustedSecond <= BigInt(0) && secondPaidMinor <= BigInt(0)) await app.repositories.clientPaymentSchedules.delete(second.id);
-    else await updateClientSchedule(second.id, { ...second, amount: fromMinorUnits(adjustedSecond) });
+  const rebalanced = new Map(
+    rebalanceClientPaymentSchedules(schedules, cashflows).map((schedule) => [schedule.id, schedule]),
+  );
+  for (const schedule of schedules) {
+    const adjusted = rebalanced.get(schedule.id);
+    if (!adjusted) {
+      await app.repositories.clientPaymentSchedules.delete(schedule.id);
+    } else if (adjusted.amount !== schedule.amount) {
+      await updateClientSchedule(schedule.id, { ...schedule, amount: adjusted.amount });
+    }
   }
-  if (adjustedFinal <= BigInt(0)) await app.repositories.clientPaymentSchedules.delete(final.id);
-  else await updateClientSchedule(final.id, { ...final, amount: fromMinorUnits(adjustedFinal) });
 }
 
 export async function recordVendorPaymentAction(
@@ -223,9 +228,15 @@ export async function recordVendorPaymentAction(
     const app = getApplication();
     const selectedSchedule = await app.repositories.vendorPaymentSchedules.getById(scheduleId);
     if (!selectedSchedule) throw new Error("Vendor payment schedule tidak ditemukan.");
+    const amount = requireAmount(values, "Amount");
+    const [schedulesBeforePayment, cashflowsBeforePayment] = await Promise.all([
+      app.repositories.vendorPaymentSchedules.getByJobId(selectedSchedule.jobId),
+      app.repositories.cashflows.getByJobId(selectedSchedule.jobId),
+    ]);
+    ensureWithinJobPaymentBalance(schedulesBeforePayment, cashflowsBeforePayment, "vendor_payment", amount);
     await recordVendorPayment({
       scheduleId,
-      amount: requireAmount(values, "Amount"),
+      amount,
       occurredOn: requireDate(values, "occurredOn", "Payment date"),
       description: values.description?.trim() || undefined,
       idempotencyKey: requireIdempotencyKey(values),

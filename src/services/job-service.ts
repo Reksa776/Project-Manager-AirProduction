@@ -131,6 +131,42 @@ export function rebalanceVendorPaymentSchedules(
   return output;
 }
 
+/** Redistribute client installment differences forward from recorded payments. */
+export function rebalanceClientPaymentSchedules(
+  schedules: readonly ClientPaymentSchedule[],
+  cashflows: readonly Cashflow[],
+): ClientPaymentSchedule[] {
+  const paidBySchedule = paidAmountsByReference(cashflows, "client_payment");
+  const ordered = schedules.map((schedule) => ({ ...schedule })).sort((a, b) => a.term.localeCompare(b.term));
+
+  for (let index = 0; index < ordered.length - 1; index += 1) {
+    const current = ordered[index];
+    const paid = toMinorUnits(paidBySchedule.get(current.id) ?? "0.00");
+    if (paid <= BigInt(0)) continue;
+
+    const difference = toMinorUnits(current.amount) - paid;
+    if (difference > BigInt(0)) {
+      current.amount = fromMinorUnits(paid);
+      ordered[index + 1].amount = fromMinorUnits(
+        toMinorUnits(ordered[index + 1].amount) + difference,
+      );
+    } else if (difference < BigInt(0)) {
+      let excess = -difference;
+      for (let nextIndex = index + 1; nextIndex < ordered.length && excess > BigInt(0); nextIndex += 1) {
+        const next = ordered[nextIndex];
+        const nextPaid = toMinorUnits(paidBySchedule.get(next.id) ?? "0.00");
+        const rawOutstanding = toMinorUnits(next.amount) - nextPaid;
+        const outstanding = rawOutstanding > BigInt(0) ? rawOutstanding : BigInt(0);
+        const reduction = excess < outstanding ? excess : outstanding;
+        next.amount = fromMinorUnits(toMinorUnits(next.amount) - reduction);
+        excess -= reduction;
+      }
+      current.amount = fromMinorUnits(paid - excess);
+    }
+  }
+  return ordered.filter((schedule) => toMinorUnits(schedule.amount) > BigInt(0));
+}
+
 function sumCashflows(
   cashflows: readonly Cashflow[],
   matches: (flow: Cashflow) => boolean,
@@ -248,8 +284,9 @@ export async function getJobDetail(jobNumber: string): Promise<JobDetail | null>
       app.repositories.cashflows.getByJobId(job.id),
     ]);
 
+  const balancedClientSchedules = rebalanceClientPaymentSchedules(clientSchedules, cashflows);
   const balancedVendorSchedules = rebalanceVendorPaymentSchedules(vendorSchedules, cashflows);
-  const totals = summarizeJobFinancials(cashflows, clientSchedules, balancedVendorSchedules, assignments);
+  const totals = summarizeJobFinancials(cashflows, balancedClientSchedules, balancedVendorSchedules, assignments);
   const crewPaidByAssignment = paidAmountsByReference(cashflows, "job_crew");
   const clientPaidBySchedule = paidAmountsByReference(cashflows, "client_payment");
   const vendorPaidBySchedule = paidAmountsByReference(cashflows, "vendor_payment");
@@ -278,7 +315,7 @@ export async function getJobDetail(jobNumber: string): Promise<JobDetail | null>
     counterparty,
     crewAssignments,
     deliveries: [...deliveries].sort((a, b) => a.deadline.localeCompare(b.deadline)),
-    clientSchedules: clientSchedules
+    clientSchedules: balancedClientSchedules
       .map((schedule) => toClientScheduleView(schedule, clientPaidBySchedule.get(schedule.id) ?? "0.00"))
       .sort((a, b) => a.term.localeCompare(b.term)),
     vendorSchedules: balancedVendorSchedules
@@ -369,7 +406,7 @@ export async function getFinanceOverview(): Promise<FinanceOverview> {
     .sort((a, b) => b.occurredOn.localeCompare(a.occurredOn));
 
   return {
-    clientSchedules: clientSchedules
+    clientSchedules: rebalanceClientPaymentSchedules(clientSchedules, cashflows)
       .map((schedule) => toClientScheduleView(schedule, clientPaidBySchedule.get(schedule.id) ?? "0.00"))
       .sort((a, b) => jobNumber(a.jobId).localeCompare(jobNumber(b.jobId))),
     vendorSchedules: rebalanceVendorPaymentSchedules(vendorSchedules, cashflows)
