@@ -62,6 +62,9 @@ export interface FinanceCrudProps {
    * kas kanonik (cashflow) tidak memiliki update/delete.
    */
   createAction?: (values: Record<string, string>) => Promise<FinanceActionResult>;
+  rowPaymentAction?: (values: Record<string, string>) => Promise<FinanceActionResult>;
+  paymentDefaultsByRow?: Record<string, Record<string, string>>;
+  paymentButtonLabel?: string;
   updateAction?: (id: string, values: Record<string, string>) => Promise<FinanceActionResult>;
   deleteAction?: (id: string) => Promise<FinanceActionResult>;
 }
@@ -90,6 +93,9 @@ export function FinanceCrud({
   filter,
   totals,
   createAction,
+  rowPaymentAction,
+  paymentDefaultsByRow,
+  paymentButtonLabel = "Payment",
   updateAction,
   deleteAction,
 }: FinanceCrudProps) {
@@ -98,6 +104,7 @@ export function FinanceCrud({
   const [filterValue, setFilterValue] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [modalIntent, setModalIntent] = useState<"create" | "edit" | "payment">("create");
   const [draft, setDraft] = useState<Record<string, string>>(() => emptyDraft(fields));
   const [modalError, setModalError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Record<string, string> | null>(null);
@@ -121,14 +128,23 @@ export function FinanceCrud({
   }
 
   function openCreate() {
+    setModalIntent("create");
     setEditingId(null);
     setDraft(emptyDraft(fields, true));
     setModalError(null);
     setModalOpen(true);
   }
   function openEdit(row: Record<string, string>) {
+    setModalIntent("edit");
     setEditingId(row.id);
     setDraft(Object.fromEntries(fields.map((f) => [f.key, row[f.key] ?? ""])));
+    setModalError(null);
+    setModalOpen(true);
+  }
+  function openPayment(row: Record<string, string>) {
+    setModalIntent("payment");
+    setEditingId(null);
+    setDraft({ ...emptyDraft(fields, true), ...(paymentDefaultsByRow?.[row.id] ?? {}) });
     setModalError(null);
     setModalOpen(true);
   }
@@ -136,7 +152,14 @@ export function FinanceCrud({
     setBusy(true);
     setModalError(null);
     let result: FinanceActionResult;
-    if (editingId) {
+    if (modalIntent === "payment") {
+      if (!rowPaymentAction) {
+        setBusy(false);
+        setModalError("Recording a payment is not supported for this item.");
+        return;
+      }
+      result = await rowPaymentAction(draft);
+    } else if (editingId) {
       if (!updateAction) {
         setBusy(false);
         setModalError("Editing is not supported for this item.");
@@ -234,7 +257,7 @@ export function FinanceCrud({
                 {columns.map((col) => (
                   <TH key={col.key}>{col.label}</TH>
                 ))}
-                {hasActions ? <TH>Actions</TH> : null}
+                {hasActions || rowPaymentAction ? <TH>Actions</TH> : null}
               </TR>
             </THead>
             <TBody>
@@ -245,8 +268,18 @@ export function FinanceCrud({
                       {row[col.key] || "-"}
                     </TD>
                   ))}
-                  {hasActions ? <TD>
+                  {hasActions || rowPaymentAction ? <TD>
                     <div className="flex gap-2">
+                      {rowPaymentAction ? (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => openPayment(row)}
+                          disabled={busy || !paymentDefaultsByRow?.[row.id]}
+                        >
+                          {paymentDefaultsByRow?.[row.id] ? paymentButtonLabel : "Paid"}
+                        </Button>
+                      ) : null}
                       {updateAction ? (
                         <button type="button" className="text-[13px] text-brand hover:underline" onClick={() => openEdit(row)} disabled={busy}>
                           Edit
@@ -269,14 +302,14 @@ export function FinanceCrud({
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editingId ? `Edit ${entityLabel}` : `Add ${entityLabel}`}
+        title={modalIntent === "payment" ? `Record ${entityLabel} Payment` : editingId ? `Edit ${entityLabel}` : `Add ${entityLabel}`}
         footer={
           <>
             <Button variant="secondary" onClick={() => setModalOpen(false)} disabled={busy}>
               Cancel
             </Button>
             <Button variant="primary" onClick={handleSubmit} disabled={busy}>
-              {busy ? "Saving..." : "Save"}
+              {busy ? (modalIntent === "payment" ? "Recording..." : "Saving...") : modalIntent === "payment" ? "Record Payment" : "Save"}
             </Button>
           </>
         }
