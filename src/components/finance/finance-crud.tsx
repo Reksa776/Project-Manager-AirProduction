@@ -50,6 +50,9 @@ export interface FinanceCrudProps {
   columns: Array<{ key: string; label: string }>;
   /** Setiap row berisi `id`, key kolom display, sekaligus raw value field form. */
   rows: Array<Record<string, string>>;
+  emptyTitle?: string;
+  emptyDescription?: string;
+  addLabel?: string;
   fields: FinanceFieldConfig[];
   filter?: { key: string; options: Array<{ value: string; label: string }> };
   totals?: Array<{ label: string; value: string }>;
@@ -80,6 +83,9 @@ export function FinanceCrud({
   entityLabel,
   columns,
   rows,
+  emptyTitle,
+  emptyDescription,
+  addLabel,
   fields,
   filter,
   totals,
@@ -186,7 +192,7 @@ export function FinanceCrud({
         <p className="text-[13px] text-ink-muted">{filtered.length} from {rows.length}</p>
         {createAction ? (
           <Button size="sm" variant="primary" onClick={openCreate}>
-            Add
+            {addLabel ?? "Add"}
           </Button>
         ) : null}
       </div>
@@ -204,12 +210,12 @@ export function FinanceCrud({
       {rows.length === 0 ? (
         <EmptyState
           icon="finance"
-          title={`No data yet ${entityLabel.toLowerCase()}`}
-          description="Saved data will appear here."
+          title={emptyTitle ?? `No data yet ${entityLabel.toLowerCase()}`}
+          description={emptyDescription ?? "Saved data will appear here."}
           action={
             createAction ? (
               <Button size="sm" variant="secondary" onClick={openCreate}>
-                Add {entityLabel}
+                {addLabel ?? `Add ${entityLabel}`}
               </Button>
             ) : undefined
           }

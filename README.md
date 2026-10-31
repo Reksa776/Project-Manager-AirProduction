@@ -34,6 +34,11 @@ database credentials must never use a `NEXT_PUBLIC_` variable.
    npm run db:seed
    ```
 
+To delete all Air Production records while keeping the tables and migration
+history, run `npm run db:reset` and type `RESET AIR PRODUCTION` when prompted.
+This also removes admin accounts and login sessions; set up an admin again
+before using the dashboard.
+
 The committed template is `.env.example`; `.env` is ignored by Git. Never paste
 Supabase credentials into source files or `NEXT_PUBLIC_*` variables.
 

@@ -13,6 +13,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check",
     "db:seed": "node scripts/db-seed.mjs",
+    "db:reset": "node scripts/db-reset.mjs",
     "db:transfer": "node scripts/migrate-mysql-to-supabase.mjs",
     "migration:snapshot": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/migration-ts-register.mjs src/migration-cli/cli.ts snapshot",
     "migration:preflight": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/migration-ts-register.mjs src/migration-cli/cli.ts preflight",
