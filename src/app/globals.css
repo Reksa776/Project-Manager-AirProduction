@@ -27,6 +27,11 @@
   --color-brand-soft: #fbf0f1;
 }
 
+:root {
+  --font-geist-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-geist-mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
 html,
 body {
   height: 100%;
